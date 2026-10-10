@@ -1,0 +1,39 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use IamAdty\Empira\Console\Application;
+use IamAdty\Empira\Console\Output;
+
+/**
+ * The `empira` console.
+ *
+ *     php bin/empira list
+ *     php bin/empira make:component Counter
+ *     php bin/empira serve --port=8080
+ *
+ * The autoloader is looked for in both places Composer puts it: a standalone
+ * checkout has `vendor/` beside `bin/`, an installed dependency has the
+ * project's autoloader three levels up.
+ */
+(static function (): void {
+    $candidates = [
+        __DIR__ . '/../vendor/autoload.php',
+        __DIR__ . '/../../../autoload.php',
+    ];
+
+    foreach ($candidates as $autoload) {
+        if (is_file($autoload)) {
+            require $autoload;
+
+            return;
+        }
+    }
+
+    fwrite(STDERR, 'empira: no Composer autoloader found. Run `composer install` first.' . PHP_EOL);
+
+    exit(1);
+})();
+
+exit((new Application())->run($argv, new Output()));

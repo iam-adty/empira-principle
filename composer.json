@@ -1,0 +1,38 @@
+{
+    "name": "iam-adty/empira-principle",
+    "description": "A PHP framework where htmx lives in PHP classes, not HTML.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["htmx", "components", "hypermedia", "server-driven", "framework"],
+    "require": {
+        "php": "^8.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "IamAdty\\Empira\\": "src/"
+        },
+        "files": [
+            "src/functions.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "IamAdty\\Empira\\Tests\\": "tests/"
+        },
+        "classmap": [
+            "tests/Fixtures/"
+        ]
+    },
+    "bin": [
+        "bin/empira"
+    ],
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
