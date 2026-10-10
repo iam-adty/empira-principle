@@ -10,13 +10,13 @@ server did not publish.
 
 ## Requirements
 
-PHP 8.4 or newer. No extensions are required. `Empira\Data\Connection` is a thin
+PHP 8.4 or newer. No extensions are required. `IamAdty\Empira\Data\Connection` is a thin
 PDO wrapper and additionally needs PDO plus a driver for your database.
 
 ## Installation
 
 ```bash
-composer require empira/empira
+composer require iam-adty/empira-principle
 ```
 
 ## A component
@@ -30,10 +30,10 @@ declare(strict_types=1);
 
 namespace App\Components;
 
-use Empira\Attributes\Post;
-use Empira\Attributes\Prop;
-use Empira\Component;
-use Empira\Element;
+use IamAdty\Empira\Attributes\Post;
+use IamAdty\Empira\Attributes\Prop;
+use IamAdty\Empira\Component;
+use IamAdty\Empira\Element;
 
 final class Counter extends Component
 {
@@ -92,8 +92,8 @@ are large, sensitive, or simply too long for a URL.
 declare(strict_types=1);
 
 use App\Components\Counter;
-use Empira\Application;
-use Empira\Http\Request;
+use IamAdty\Empira\Application;
+use IamAdty\Empira\Http\Request;
 
 $app = new Application($_ENV['APP_SECRET']);
 
@@ -133,7 +133,7 @@ pattern declared above a general one just wins.
 
 ```php
 use App\Http\TodoController;
-use Empira\Http\Response;
+use IamAdty\Empira\Http\Response;
 
 $app->routes()->get('/todos/new', fn(): Response => Response::html('new'), 'todos.new');
 $app->routes()->get('/todos/{id}', [TodoController::class, 'show'], 'todos.show', defaults: ['id' => 0]);
@@ -149,7 +149,7 @@ $app->routes()->get('/search', [TodoController::class, 'search'], 'todos.search'
   class-string when the controller is invokable. Dependencies are autowired, so
   a handler can type-hint `Request`, `Response` or anything else the container
   holds.
-- Controllers extend `Empira\Routing\Controller`, which gives you `view()`,
+- Controllers extend `IamAdty\Empira\Routing\Controller`, which gives you `view()`,
   `redirect()`, `json()`, `abort()` and `url()`.
 - An unmatched path is a 404; a path that matches with the wrong method is a
   405 with an `Allow` header.
@@ -180,9 +180,9 @@ Groups nest, and share a prefix, parameter defaults and middleware.
 
 ```php
 use Closure;
-use Empira\Http\Middleware;
-use Empira\Http\Request;
-use Empira\Http\Response;
+use IamAdty\Empira\Http\Middleware;
+use IamAdty\Empira\Http\Request;
+use IamAdty\Empira\Http\Response;
 
 final class RequireHtmx implements Middleware
 {
@@ -207,7 +207,7 @@ page's token is forwarded as a header, once, on `<body>` — where `hx-headers`
 is inherited by every element below it.
 
 ```php
-$csrf = new Empira\Security\Csrf();
+$csrf = new IamAdty\Empira\Security\Csrf();
 
 $app = new Application($_ENV['APP_SECRET'], csrf: $csrf);
 ```
@@ -225,11 +225,11 @@ the action declares. A missing or wrong token is a 403.
 
 ## Testing
 
-`Empira\Testing\TestClient` drives an application the way a browser would, so a
+`IamAdty\Empira\Testing\TestClient` drives an application the way a browser would, so a
 test can make a request in one line and assert in the next.
 
 ```php
-use Empira\Testing\TestClient;
+use IamAdty\Empira\Testing\TestClient;
 
 $client = new TestClient($app);
 
@@ -274,11 +274,15 @@ composer install
 composer test
 ```
 
-The demo application under `examples/` runs the same way:
+The console comes with the package:
 
 ```bash
-php -S localhost:8000 -t examples/public examples/public/index.php
+vendor/bin/empira list
+vendor/bin/empira make:component Counter
 ```
+
+A worked application lives in [`../app`](../app) — start there if you would
+rather read a real app than a reference component.
 
 ## License
 
