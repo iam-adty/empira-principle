@@ -27,9 +27,12 @@ php bin/empira make:component Counter            # generators write to src/compo
 php bin/empira route:list                        # routes an app registers
 ```
 
-`.github/workflows/tests.yml` runs the suite on PHP 8.4 and 8.5 for every push
-and pull request. **It is still the only gate** — a green run means the suite
-passed, not that the change was right.
+`.github/workflows/tests.yml` is written but **not running**: there is no remote,
+and GitHub Actions only executes for a repository hosted on GitHub. It covers
+PHP 8.4 and 8.5 and will start running whenever one is added.
+
+Until then **the test suite is the only gate** — run it before claiming
+something works.
 
 ## Where things live
 

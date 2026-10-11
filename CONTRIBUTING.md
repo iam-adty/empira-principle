@@ -4,8 +4,9 @@
 > actually does; new code is expected to match.
 
 Thanks for looking. This is a young framework, and the test suite is still the
-gate — CI runs it on PHP 8.4 and 8.5, but a green run only means the suite
-passed. Please run it yourself before claiming something works.
+gate. A GitHub Actions workflow is written for PHP 8.4 and 8.5, but it does not
+run until this repository has a remote — so please run `composer test` yourself
+before claiming something works.
 
 ## Setup
 

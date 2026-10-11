@@ -104,7 +104,9 @@ header at all**, so a wildcard resolves to HTML. Verified against
 - ~~`.opencode/skills/` (4) + `opencode.json`~~
 
 ### 4. Operations — 2026-10-11
-- ~~CI: `.github/workflows/tests.yml` in both repositories, PHP 8.4 and 8.5~~
+- [ ] CI — `.github/workflows/tests.yml` is **written in both repositories**
+  (PHP 8.4 and 8.5) but **not running**: there is no remote, and GitHub Actions
+  only executes for a repository hosted on GitHub. Unblocked by the item below.
 - ~~Decided: `.opencode/`, `tests/` and `.github/` are **export-ignored** — the
   published package carries `src/`, `docs/`, `bin/` and the markdown docs. The
   skills point at this repository's own `tests/` paths, which do not exist in a
