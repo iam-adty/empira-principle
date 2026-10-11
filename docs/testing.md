@@ -1,0 +1,179 @@
+# Testing
+
+> **Status: describes shipped code.** `587 tests, 1060 assertions`.
+
+## Running
+
+```bash
+composer test                                  # everything (~0.6s)
+vendor/bin/phpunit tests/RoutingTest.php       # one file
+vendor/bin/phpunit --filter=testACycle         # one behaviour
+```
+
+No database, no network, no fixtures to load. The suite is fast because it never
+starts a server.
+
+## TestClient
+
+The fastest way to drive an application:
+
+```php
+use IamAdty\Empira\Testing\TestClient;
+
+$client = new TestClient($app);
+
+$client->get('/todos')
+    ->assertOk()
+    ->assertSee('buy milk');
+
+$client->asHtmx()->post('/empira/<token>/add', ['title' => 'walk dog'])
+    ->assertSee('walk dog');
+
+$client->get('/nope')->assertNotFound();
+```
+
+| Method | Purpose |
+|---|---|
+| `get/post/put/patch/delete($uri, $body, $headers)` | set up a request |
+| `withHeader($name, $value)` | header for the next request only |
+| `asHtmx()` | adds `HX-Request: true` |
+| `request()` | send it, returns a `TestResponse` |
+
+`TestResponse` asserts and returns `$this`, so they chain: `assertOk()`,
+`assertNotFound()`, `assertForbidden()`, `assertStatus()`, `assertSee()`,
+`assertDontSee()`, `assertHeader()`. They delegate to PHPUnit's `Assert`, so
+failures are real `AssertionFailedError`s that count in the runner.
+
+**CSRF is handled.** A POST through the client attaches a valid token unless you
+supply your own — verified against `Csrf::isValid()` rather than assumed. If you
+want to test rejection, pass a wrong token explicitly.
+
+**A query string in the URI is parsed.** `get('/todos?q=milk')` puts `q` in
+`Request::$query`, matching what `Request::capture()` does from a real request.
+
+## Driving it by hand
+
+When you want the raw `Response`:
+
+```php
+$app->handle(new Request('GET', '/'));
+
+$app->handle(new Request('POST', $actionUrl, body: ['title' => 'x'], headers: [
+    'HX-Request' => 'true',
+    'X-CSRF-Token' => $csrf->token(),
+]));
+```
+
+**Prefer a real round trip.** The pattern this codebase uses most is: render a
+page, extract the signed URL from its own markup, post to that, assert on the
+returned fragment.
+
+```php
+$html = (string) $app->render(Counter::class)->render();
+
+preg_match('/hx-post="([^"]*increment)"/', $html, $m);
+$url = html_entity_decode($m[1], ENT_QUOTES);
+
+$fragment = $app->handle(new Request('POST', $url))->body();
+
+$this->assertStringContainsString('<strong>5</strong>', $fragment);
+```
+
+That exercises the signing, the routing and the rendering together — if wiring
+breaks, the test fails without anyone asserting on markup by hand.
+
+## Fixtures
+
+Shared fixtures live in `tests/Fixtures/Components.php` and are loaded via
+`classmap` in `autoload-dev`.
+
+| Fixture | Exercises |
+|---|---|
+| `CounterFixture` | a stateless component; props travel in the token |
+| `NamedRootFixture` | a component that names its own root element |
+| `StatefulFixture` | props in a `StateStore` |
+| `BadActionFixture` | a private method declared as an action — must be refused |
+| `UnregisteredFixture` | proves nothing is constructed for an unknown class |
+| `ChattyFixture` | a component that sets response headers |
+| `TypedPropsFixture` | `#[Prop]` typed state and coercion |
+| `VerbsFixture` | one action per HTTP verb |
+| `MixedActionsFixture` | attribute and `actions()` declarations together |
+| `MemoryStore` | an in-memory `StateStore`, so stateful tests need no session |
+
+## Conventions
+
+- `final class XTest extends TestCase`, in `namespace IamAdty\Empira\Tests;`
+- Method names read as behaviour: `testATypedPropertyMutatesAcrossRequests`
+- `assertSame` over `assertEquals`
+- Fixtures are defined at the **bottom of the test file**, or in `Fixtures/` when shared.
+
+## Write a test that can fail
+
+**A test that cannot fail is worse than no test**, because it is trusted.
+
+This one passed for months while asserting nothing:
+
+```php
+// WRONG — "htmx" also matches class="htmx-indicator" in the layout
+$this->assertStringContainsString('htmx', $response->body());
+```
+
+It would have passed whether the search returned one hit or none. The correct
+version asserts the thing that can only appear if the behaviour worked:
+
+```php
+$this->assertStringContainsString('<li>multitail</li>', $response->body());
+$this->assertStringContainsString('<ul id="results"></ul>', $noMatch->body());
+```
+
+**Before committing, ask: what would the opposite behaviour produce?** If the
+answer is "the same string", the assertion is worthless.
+
+Prove it: revert your fix and confirm the test goes red.
+
+```bash
+# the strongest check a regression test can pass
+git stash && vendor/bin/phpunit tests/LayoutTest.php   # must fail
+git stash pop && vendor/bin/phpunit tests/LayoutTest.php   # must pass
+```
+
+## Hooks without tests are bugs waiting
+
+`Layout::styles()` appended its return value straight into `<head>`. Returning
+raw CSS emitted naked text that browsers hoist away and discard — the app
+rendered unstyled, returned `200`, and nothing caught it for the life of the
+feature. `src/View/` had no test file at all.
+
+**Add the test with the feature.**
+
+## Temporary directories
+
+```php
+$path = tempnam(sys_get_temp_dir(), 'empira-env');
+
+try {
+    // …
+} finally {
+    unlink($path);
+}
+```
+
+`finally` matters: a failing assertion otherwise leaves the file behind.
+
+## Without a session
+
+There is no session under the CLI, so `Csrf` and `SessionState` fall back to an
+in-process `$_SESSION` array that persists for the life of the process. Reset it
+between tests that should not see each other's state:
+
+```php
+protected function setUp(): void
+{
+    $_SESSION = [];
+}
+```
+
+## Further reading
+
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — the full pre-commit checklist
+- [../AGENTS.md](../AGENTS.md) — known traps

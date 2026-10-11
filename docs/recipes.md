@@ -1,0 +1,263 @@
+# Recipes
+
+> **Status: describes shipped code.** Copy, paste, adapt.
+
+Each recipe here has a matching agent skill in `.opencode/skills/`, so the same
+guidance serves a person and an assistant.
+
+---
+
+## Add a component
+
+```bash
+php bin/empira make:component TodoList
+```
+
+Then edit the generated file:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Components;
+
+use IamAdty\Empira\Attributes\Delete;
+use IamAdty\Empira\Attributes\Post;
+use IamAdty\Empira\Attributes\Prop;
+use IamAdty\Empira\Component;
+use IamAdty\Empira\Element;
+
+final class TodoList extends Component
+{
+    #[Prop] public array $items = [];
+    #[Prop] public string $draft = '';
+
+    public function actions(): array { return ['add', 'remove']; }
+
+    #[Post] public function add(): void
+    {
+        $title = trim($this->request()->string('title'));
+
+        if ($title === '') {
+            return;
+        }
+
+        $this->items[] = ['id' => bin2hex(random_bytes(4)), 'title' => $title];
+    }
+
+    #[Delete] public function remove(string $id): void
+    {
+        $this->items = array_values(array_filter(
+            $this->items,
+            static fn(array $item): bool => $item['id'] !== $id
+        ));
+    }
+
+    protected function render(): Element
+    {
+        return $this->hx->div('#todos')
+            ->append(
+                $this->hx->form()
+                    ->action('add')
+                    ->append(
+                        $this->hx->input()->attr('name', 'title'),
+                        $this->hx->button('Add'),
+                    )
+            )
+            ->append(
+                $this->hx->ul()->append(...array_map(
+                    fn(array $item): Element => $this->hx->li()
+                        ->text($item['title'])
+                        ->append($this->hx->button('x')->action('remove', ['vals' => ['id' => $item['id']]])),
+                    $this->items
+                ))
+            );
+    }
+}
+```
+
+**Register it.** A token cannot resolve an unregistered class:
+
+```php
+$app->registry()->alias('todos', TodoList::class);
+```
+
+**Then test it.** Render, follow the signed URL, assert on the fragment:
+
+```php
+$html = (string) $app->render(TodoList::class)->render();
+preg_match('/hx-post="([^"]*add)"/', $html, $m);
+$add = html_entity_decode($m[1], ENT_QUOTES);
+
+$fragment = $app->handle(new Request('POST', $add, body: ['title' => 'walk dog']))->body();
+
+$this->assertStringContainsString('walk dog', $fragment);
+```
+
+Gotchas: `render()` must return `Element|Raw` (a bare string gets escaped);
+`->action()` takes an **action name**, not a URL; every action needs a verb.
+
+---
+
+## Add a route
+
+```php
+// app/routes.php — returned closure receives the RouteCollection
+return static function (RouteCollection $routes): void {
+    $routes->get('/todos', [TodoController::class, 'index'], 'todos.index');
+};
+```
+
+```php
+final class TodoController extends Controller
+{
+    public function index(): Response
+    {
+        return $this->view(TodoLayout::class);
+    }
+}
+```
+
+Type a path parameter with `defaults`:
+
+```php
+$routes->get('/todos/{id}', [TodoController::class, 'show'], 'todos.show',
+    defaults: ['id' => 0]);        // arrives as int
+```
+
+Group shared prefixes and middleware:
+
+```php
+$routes->group('/admin', function (RouteCollection $r): void {
+    $r->get('/stats', [StatsController::class, 'show']);
+}, middleware: [RequireAuth::class]);
+```
+
+**Order matters.** `/todos/new` must be declared before `/todos/{id}`.
+
+---
+
+## Add a page region
+
+```php
+protected function regions(): array
+{
+    return [
+        'todos' => fn(Region $region): mixed => $region
+            ->element('section')
+            ->class('card')
+            ->append(
+                $region->hx()->h2('Todos'),
+                $region->component(TodoList::class)
+            ),
+    ];
+}
+```
+
+Every region gets `id="region-<name>"`, which is what htmx targets. A component
+rendered inside one swaps in place.
+
+Out-of-band — update somewhere else in the page with the same response:
+
+```php
+->append($region->oob($this->hx->span()->id('count')->text('3')))
+```
+
+Lazy — do not block the page on it:
+
+```php
+'analytics' => fn(Region $r) => $r->lazy('/analytics/panel'),
+```
+
+---
+
+## Style a page
+
+```php
+protected function styles(): Element|Raw
+{
+    return Raw::of('body { font: 16px system-ui; }');   // wrapped in <style>
+}
+```
+
+Return an `Element` to control the tag yourself:
+
+```php
+return $this->hx->link()->attr('rel', 'stylesheet')->attr('href', '/app.css');
+```
+
+Empty string → no element at all.
+
+---
+
+## Validate input in an action
+
+```php
+#[Post]
+public function add(): void
+{
+    if ($this->validate(['title' => 'required|max:200'])->any()) {
+        return;                       // re-renders; the bag fired an event
+    }
+
+    $this->items[] = $this->request()->string('title');
+}
+```
+
+Rules: `required`, `nullable`, `string`, `integer`, `numeric`, `boolean`, `array`,
+`email`, `min:N`, `max:N`, `in:a,b,c`, `regex:/…/`, `confirmed`, `same:field`.
+An unknown rule throws — a typo cannot silently pass.
+
+On failure an `HX-Trigger-After-Swap` event fires carrying the messages, so a
+form can show them without the component knowing the page around it.
+
+---
+
+## Flash a message
+
+```php
+$this->flash('success', 'Saved.');
+```
+
+Read it in the layout:
+
+```php
+foreach ($app->session()->flashed() as $message) { … }
+```
+
+`flashed()` reads **and forgets** — a message is delivered once.
+
+---
+
+## Verify before you commit
+
+```bash
+composer test
+find src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+```
+
+For a framework change, also boot it:
+
+```bash
+php -S 127.0.0.1:8000 -t examples/public examples/public/index.php &
+curl -s localhost:8000 | head -20
+```
+
+Then prove the test can fail:
+
+```bash
+git stash && vendor/bin/phpunit tests/YourTest.php   # red
+git stash pop && vendor/bin/phpunit tests/YourTest.php   # green
+```
+
+---
+
+## Further reading
+
+- [components.md](components.md) — the component API in full
+- [routing.md](routing.md) — the routing API
+- [views.md](views.md) — layouts and regions
+- [testing.md](testing.md) — testing conventions
+- [../SECURITY.md](../SECURITY.md) — before touching anything security-adjacent
+- [../AGENTS.md](../AGENTS.md) — known traps
