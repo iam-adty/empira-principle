@@ -18,8 +18,10 @@ returning an `Element`. Every `hx-*` attribute is generated — you never write 
 3. **Every action needs a verb.** `#[Post]` (or `#[Get]`, `#[Put]`, `#[Patch]`,
    `#[Delete]`). The verb names the `hx-*` attribute **and** the method the router
    accepts — one declaration, so they cannot drift.
-4. **Every component must be registered.** A token cannot resolve an unregistered
-   class.
+4. **Every component must be registered — including one you only nest.** A token
+   cannot resolve an unregistered class, and `renderComponent()` does not exempt
+   you: it builds the component directly, but the token its button carries is
+   resolved through the registry when pressed.
 
 ## Scaffold
 
@@ -81,6 +83,12 @@ $app->registry()->alias('todos', TodoList::class);
 
 Without this the token cannot resolve the class and the request 403s.
 
+**This includes a component you only ever nest.** `renderComponent()` builds it
+directly, so nothing looks wrong — but its action URL carries a token naming the
+class, and that token is resolved through the registry when the button is
+pressed. An unregistered nested component renders perfectly and then answers
+404 the first time anyone clicks it.
+
 ## State: `#[Prop]` or the props array
 
 `#[Prop]` is the modern form:
@@ -101,6 +109,52 @@ naming a class cannot make the framework construct it.
 
 The legacy array API still works and the two may coexist across components, but
 within one component a `#[Prop]` key wins over `with()`.
+
+## Actions take what they ask for
+
+An action's parameters are resolved by type, exactly as a controller's are — so
+a component can do the work itself rather than handing its form to a controller
+somewhere else:
+
+```php
+#[Post]
+public function login(Auth $auth, UserRepository $users): void
+{
+    $user = $users->byEmail($this->request()->string('email'));
+
+    if ($user === null || !$users->verify($user, $this->request()->string('password'))) {
+        $this->with('error', 'Those credentials did not match any account.');
+
+        return;
+    }
+
+    $auth->login($user);
+
+    $this->response()->redirect('/dashboard');
+}
+```
+
+**The return value is discarded.** An action responds by mutating props (`with()`
+re-renders the swap) and the response (`response()->redirect()` sets
+`HX-Redirect`). It is what the swap is built from.
+
+`$this->validate()` returns an `ErrorBag` and **does not throw** — a
+`try { validate() } catch (ValidationException)` writes invalid data to the
+database.
+
+## Styling travels with the component
+
+```php
+protected function styles(): Raw
+{
+    return Raw::of('.todo-list li { margin: .25rem 0 }');
+}
+```
+
+It is emitted as a `<style>` **inside the root element**, which is the swap
+target — so it arrives again with every htmx swap, where a sheet in `<head>`
+would be long gone. Return an empty `Raw` for a structural component with no
+appearance of its own; a form composes its fields and owns their styling.
 
 ## Out of band and lazy
 

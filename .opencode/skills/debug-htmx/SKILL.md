@@ -50,10 +50,16 @@ curl -s localhost:8000/ | grep -o 'hx-headers="[^"]*"'
 
 The token lives in the session. Reproduce with a cookie jar:
 
+Scratch files go in the package's own `tmp/`, not `/tmp`, so a failed
+reproduction leaves its evidence where you will look for it. Run from the
+**workspace root**:
+
 ```bash
-JAR=/tmp/j.txt && rm -f $JAR
-curl -s -c $JAR -o /tmp/page.html localhost:8000/
-CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' /tmp/page.html | head -1 | grep -oE '[a-f0-9]{40,}')
+mkdir -p ../principle/tmp
+JAR=../principle/tmp/htmx-j.txt && rm -f $JAR
+curl -s -c $JAR -o ../principle/tmp/page.html localhost:8000/login
+CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' ../principle/tmp/page.html \
+       | head -1 | grep -oE '[a-f0-9]{40,}')
 curl -s -b $JAR -c $JAR -X POST "http://localhost:8000/<action-url>" \
   -H 'HX-Request: true' -H "X-CSRF-Token: $CSRF"
 ```
@@ -66,7 +72,7 @@ harness mistake.
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  'http://localhost:8000/empira/AAAA.BBBB/increment' -H 'HX-Request: true'
+  'http://localhost:8000/empira/AAAA.BBBB/login' -H 'HX-Request: true'
 # 403 is CORRECT — the signature does not verify
 ```
 
@@ -128,13 +134,22 @@ shipped once. Check `src/View/Layout.php`.
 ## A fast harness
 
 ```bash
-php -S 127.0.0.1:8000 -t examples/public examples/public/index.php &
-JAR=/tmp/j.txt && rm -f $JAR
+php -S 127.0.0.1:8000 -t ../app/public ../app/public/index.php &
+mkdir -p ../principle/tmp
+JAR=../principle/tmp/htmx-j.txt && rm -f $JAR
+PAGE=../principle/tmp/htmx-page.html
 
-# full page, then a fragment, then an action
-curl -s -c $JAR -o /tmp/p.html localhost:8000/
-curl -s -b $JAR localhost:8000/ -H 'HX-Request: true' -H 'HX-Target: region-counter'
-curl -s -b $JAR -c $JAR -X POST 'localhost:8000/<url>' \
+# a full page, a fragment, then an action — against /login, which a guest
+# can reach without a session
+curl -s -c $JAR -o $PAGE localhost:8000/login
+CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' $PAGE | head -1 | grep -oE '[a-f0-9]{40,}')
+URL=$(grep -oE 'hx-post="[^"]*/login"' $PAGE | head -1 \
+      | sed 's/hx-post="//; s/"$//' | sed 's/&amp;/\&/g')
+
+# the target is a component's own id, which the page renders for us
+TARGET=$(grep -oE 'id="e-[a-f0-9]+"' $PAGE | head -1 | sed 's/id="//; s/"//')
+curl -s -b $JAR "localhost:8000/login" -H 'HX-Request: true' -H "HX-Target: $TARGET"
+curl -s -b $JAR -c $JAR -X POST "localhost:8000$URL" \
   -H 'HX-Request: true' -H "X-CSRF-Token: $CSRF"
 ```
 

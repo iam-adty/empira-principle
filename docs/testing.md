@@ -148,17 +148,34 @@ feature. `src/View/` had no test file at all.
 
 ## Temporary directories
 
-```php
-$path = tempnam(sys_get_temp_dir(), 'empira-env');
+Scratch files go in **`tmp/`**, inside the repository — not `sys_get_temp_dir()`.
+`Tests\Temp` creates the folder and hands out a unique name each time:
 
+```php
+$path = Temp::file('empira-env');      // a unique file in tmp/
+$directory = Temp::dir('empira-log-'); // a unique directory, created
+```
+
+Two reasons it is not `/tmp`: a failing run leaves its fixtures somewhere you
+would think to look, and `tmp/` is visible from **both** places this suite runs
+— the host, and the test container where the repository is mounted at `/app`.
+`dirname(__DIR__)` resolves correctly from either, so no environment variable
+and no extra volume are involved.
+
+`finally` still matters, or a failing assertion leaves the file behind:
+
+```php
 try {
     // …
 } finally {
-    unlink($path);
+    Temp::remove($path);
 }
 ```
 
-`finally` matters: a failing assertion otherwise leaves the file behind.
+`Temp::remove()` is recursive, because a fixture is often a tree — a logger
+creating its own parent directories, say. It is also how the suite keeps
+`tmp/` empty: if something is left there after a run, a test failed partway and
+that is the clue.
 
 ## Without a session
 

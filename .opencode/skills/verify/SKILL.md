@@ -41,37 +41,63 @@ vendor/bin/phpunit --filter=testACycle
 
 A passing suite does not prove the browser path works.
 
+Run this from the **workspace root** so `../principle/tmp` is writable; every
+scratch file lands in the package's own `tmp/` rather than `/tmp`, where a
+failing run would leave it out of sight.
+
 ```bash
-cd app
-php -S 127.0.0.1:8801 -t public public/index.php &
+mkdir -p ../principle/tmp
+JAR=../principle/tmp/verify-jar.txt && rm -f $JAR
+OUT=../principle/tmp/verify
+
+php -S 127.0.0.1:8801 -t ../app/public ../app/public/index.php &
 sleep 2
 
-JAR=/tmp/verify.txt && rm -f $JAR
-
-# the page
-curl -s -c $JAR -o /tmp/v0.html -w 'GET /          %{http_code}\n' http://127.0.0.1:8801/
-CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' /tmp/v0.html | head -1 | grep -oE '[a-f0-9]{40,}')
-ACTION=$(grep -oE 'hx-post="[^"]*/increment"' /tmp/v0.html | head -1 \
+# the sign-in page, and the signed action its form carries
+curl -s -c $JAR -o $OUT.0.html -w 'GET  /login   %{http_code}\n' http://127.0.0.1:8801/login
+CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' $OUT.0.html | head -1 | grep -oE '[a-f0-9]{40,}')
+ACTION=$(grep -oE 'hx-post="[^"]*/login"' $OUT.0.html | head -1 \
          | sed 's/hx-post="//; s/"$//' | sed 's/&amp;/\&/g')
 
-# an action round trip
-curl -s -b $JAR -c $JAR -o /tmp/v1.html -w 'POST action   %{http_code}\n' \
-  -X POST "http://127.0.0.1:8801$ACTION" -H 'HX-Request: true' -H "X-CSRF-Token: $CSRF"
+# an action round trip — a wrong password must re-render the form
+curl -s -b $JAR -c $JAR -o $OUT.1.html -w 'POST action   %{http_code}\n' \
+  -X POST "http://127.0.0.1:8801$ACTION" -H 'HX-Request: true' -H "X-CSRF-Token: $CSRF" \
+  --data-urlencode 'email=nobody@example.com' --data-urlencode 'password=wrong'
+grep -c 'did not match' $OUT.1.html    # must be 1
 
 # a fragment must not contain the document
-curl -s -b $JAR -o /tmp/v2.html http://127.0.0.1:8801/ \
-  -H 'HX-Request: true' -H 'HX-Target: region-counter'
-grep -c '<html' /tmp/v2.html        # must be 0
+TARGET=$(grep -oE 'id="region-[a-z]+"' $OUT.0.html | head -1 | sed 's/id="//; s/"//')
+curl -s -b $JAR -o $OUT.2.html http://127.0.0.1:8801/login \
+  -H 'HX-Request: true' -H "HX-Target: $TARGET"
+grep -c '<html' $OUT.2.html        # must be 0
 
-# the guards — these SHOULD fail
+# the gates — these SHOULD fail
 curl -s -o /dev/null -w 'forged token %{http_code}\n' \
-  -X POST 'http://127.0.0.1:8801/empira/AAAA.BBBB/increment' -H 'HX-Request: true'
+  -X POST 'http://127.0.0.1:8801/empira/AAAA.BBBB/login' -H 'HX-Request: true'
 curl -s -o /dev/null -w 'no csrf     %{http_code}\n' \
   -X POST "http://127.0.0.1:8801$ACTION" -H 'HX-Request: true'
+curl -s -o /dev/null -w 'guest dash  %{http_code}\n' http://127.0.0.1:8801/dashboard
 curl -s -o /dev/null -w 'unknown url %{http_code}\n' http://127.0.0.1:8801/nope
+
+rm -f $OUT.*.html $JAR
 ```
 
-Expected: `200`, `200`, fragment `0`, forged `403`, no-csrf `403`, unknown `404`.
+Expected: `200`, `200`, error `1`, fragment `0`, forged `403`, no-csrf `403`,
+guest dashboard `302`, unknown `404`.
+
+`/login` is used because a guest can reach it, so no session is needed — and
+because it exercises the same thing the old `Counter` check did: a
+CSRF-protected component action, round-tripped through a real server.
+
+The two `403`s come from different places and it is worth knowing which is
+which. A **forged token** fails the HMAC in `TokenCodec`. A **missing token**
+fails `Csrf::verify()` inside `Component::beforeAction()`, which throws
+`ForbiddenActionException`. The `419` belongs to `VerifyCsrfToken`, the
+middleware for ordinary route posts — and the demo app does not register it
+globally, so you will not see a `419` here. If you ever do, something *is*
+registered globally.
+
+
 
 **Keep the cookie jar.** Without it each request gets a fresh session and a fresh
 CSRF token, which looks exactly like a broken guard.
