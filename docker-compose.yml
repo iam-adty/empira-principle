@@ -40,6 +40,23 @@ services:
     build: .
     # Named rather than left to Compose, which would call it `principle-php`.
     image: empira/principle
+    # Deliberately idle, and deliberately **not** the test runner.
+    #
+    # `tools/test` runs the suite in its own `--rm` container, named
+    # `empira-principle`, and that output is what `composer test` checks. This
+    # service is the thing you exec into — `docker compose exec php php
+    # bin/empira list` — and `docker compose run` supplies its own command, so
+    # this line does not touch the gate.
+    #
+    # It used to inherit the image's `CMD ["vendor/bin/phpunit"]`, which meant
+    # every `docker compose up` ran the suite once and exited. Two problems: the
+    # container sat at `exited (2)` in `docker compose ps`, which reads like a
+    # red build; and its logs showed whichever run last started there, which can
+    # be far older than your working tree — so a stale failure looks current.
+    # Worse, that command skipped `composer dump-autoload` and the summary check,
+    # so it could report success on a suite that never finished. That is the
+    # failure the gate exists to catch, sitting in the one command nobody reads.
+    command: ["sleep", "infinity"]
     depends_on:
       postgres:
         condition: service_healthy

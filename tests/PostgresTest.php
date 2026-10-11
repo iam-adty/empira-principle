@@ -10,7 +10,6 @@ use Doctrine\ORM\Tools\SchemaTool;
 use IamAdty\Empira\Auth\DoctrineUserProvider;
 use IamAdty\Empira\Auth\User;
 use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Config\DatabaseConfig;
 use IamAdty\Empira\Persistence\EntityManagerFactory;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;

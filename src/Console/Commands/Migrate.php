@@ -11,7 +11,6 @@ use Doctrine\Migrations\Exception\NoMigrationsToExecute;
 use Doctrine\Migrations\Metadata\MigrationPlanList;
 use Doctrine\Migrations\MigratorConfiguration;
 use Doctrine\Migrations\Version\Direction;
-use Doctrine\Migrations\Version\Version;
 use IamAdty\Empira\Config\DatabaseConfig;
 use IamAdty\Empira\Console\Command;
 use IamAdty\Empira\Console\Output;

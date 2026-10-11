@@ -27,6 +27,8 @@ find src tests -name '*.php' -print0 | xargs -0 -n1 php -l   # lint sweep
 php bin/empira list                              # the console
 php bin/empira make:component Counter            # generators write to src/components
 php bin/empira route:list                        # routes an app registers
+
+docker compose exec php php bin/empira list      # the same, inside the container
 ```
 
 **The test suite is the only gate** — `composer test` runs it, in Docker,
@@ -39,6 +41,19 @@ proves nothing. It also refuses a run that **finished early**: PHPUnit's own exi
 status cannot report truncation, so the script checks that a summary line was
 printed. That check is why `composer test` means what it says — read
 [`Fixed`](#fixed--do-not-reintroduce) for the measurement behind it.
+
+**The `php` service is not the gate.** `tools/test` runs the suite in its own
+`--rm` container named `empira-principle`, and *that* output is what
+`composer test` checks. The `php` service is the thing you `exec` into; it idles.
+So:
+
+- `docker compose ps` showing `php` **running** means a container is open, not
+  that a suite passed.
+- `docker compose logs php` shows whatever that container last did. It used to
+  run the suite on every `up` and exit, so its logs could show a failure from
+  long before your working tree — and it sat at `exited (2)`, which reads like
+  a red build. Read the commit history or re-run the suite instead.
+- Only `composer test` decides whether anything passed.
 
 ## Where things live
 
