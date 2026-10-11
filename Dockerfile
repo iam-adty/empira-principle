@@ -46,4 +46,10 @@ COPY . .
 # Now that the real fixtures are present, rebuild the classmap over them.
 RUN composer dump-autoload --no-interaction
 
-CMD ["vendor/bin/phpunit"]
+# Matches the inner half of `tools/test`: a bare `phpunit` would miss the
+# classmapped fixtures added after the image was built, because `vendor/`'s
+# classmap predates them. `tools/test` regenerates it for exactly that reason.
+#
+# The summary-line check that makes `composer test` a *gate* cannot come along —
+# it needs Docker to be driving — so this is a test runner, not the gate.
+CMD ["sh", "-c", "composer dump-autoload --no-interaction --quiet && vendor/bin/phpunit"]
