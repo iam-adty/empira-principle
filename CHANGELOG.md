@@ -23,6 +23,20 @@ can change without a major bump, though changes are always documented here.
 - **A documented worker-safety contract.** What the framework resets per
   request, what it deliberately keeps, and the rules for holding new code to
   it — [docs/workers.md](docs/workers.md).
+- **`Application::respond()` — the worker's entry point, beside `send()`.**
+  `send()` emits and exits, which is right for a process with nothing to come
+  back to. Under a worker it is fatal: the script ends, FrankenPHP restarts it,
+  and the process serves exactly one request — correct, and none of the point.
+
+  `respond()` is the same call without the exit, so a front controller reads the
+  same way whichever runtime it is under. `handle(Request): Response` is
+  untouched and stays public, which is what lets `TestClient` drive the whole
+  framework with synthetic requests and no running server.
+
+  A throwable from `handle()` propagates out of `respond()` rather than being
+  swallowed, because in a worker `set_exception_handler` only fires when the
+  script ends — which never comes. Error policy belongs to whoever owns the
+  runtime.
 - **`$app->components(__NAMESPACE__)` — reachability by namespace.** Every
   `Component` under a prefix becomes reachable by token without being named.
   Registration had become the price of nesting, and it was paid for components

@@ -648,10 +648,49 @@ final class Application
     /**
      * Route a request (captured from the environment) and send the result.
      * Terminates the script.
+     *
+     * For a classic runtime — php-fpm, the built-in server, FrankenPHP in
+     * classic mode. One request, one process, nothing to come back to.
+     *
+     * @see self::respond() for the same thing under a worker
      */
     public function send(?Request $request = null): never
     {
         $this->handle($request ?? Request::capture())->send();
+    }
+
+    /**
+     * Route a request, emit the result, and return.
+     *
+     * The worker's counterpart to {@see send()}, and the reason it exists. The
+     * two runtimes should read the same at the call site — one call, not
+     * plumbing — while doing the one thing that differs between them:
+     *
+     * `send()` **emits and exits**, which is right for a process with nothing
+     * else to do. Under a worker it is fatal: the script ends, FrankenPHP
+     * restarts it, and the process serves exactly one request — correct, and
+     * none of the point of running a worker. So this emits and returns.
+     *
+     *     $handler = static function () use ($app): void {
+     *         try {
+     *             $app->respond();
+     *         } catch (\Throwable $e) {
+     *             // still needed: see below
+     *         }
+     *     };
+     *
+     * The `catch` is not decoration. `set_exception_handler` fires when the
+     * script ends, which in a worker is never, so a throwable that escapes
+     * {@see handle()} — a genuine bug the framework chose to re-throw rather
+     * than dress as a tidy 500 — would take the worker down and be restarted
+     * straight back into the same bug. Error policy belongs to whoever owns the
+     * runtime, so it stays at the call site rather than being swallowed here.
+     *
+     * @see self::handle() to get the response instead of sending it
+     */
+    public function respond(?Request $request = null): void
+    {
+        ($this->handle($request ?? Request::capture()))->emit();
     }
 
 /**

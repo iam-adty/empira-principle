@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `783 tests, 1439 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `790 tests, 1451 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -144,6 +144,10 @@ $this->hx->div()->append(Raw::of('<b>hi</b>'))->render(); // <div><b>hi</b></div
 Note what this is *not*: `render()` is declared `Element|Raw|string`, and `Component::markup()` wraps a returned string in `Raw` for you — so returning a plain string from `render()` is supported and is **not** a type error. The escaping happens at `Element::append()`. Wrap markup in `Raw::of()` when you mean it literally.
 
 **A test can pass while asserting nothing.** `AppTest` once asserted `assertStringContainsString('htmx', $body)` — which matched `class="htmx-indicator"` in the layout and would have passed whatever the search returned. **Assert on something that can only appear if the behaviour worked**: a specific `<li>`, an exact attribute, a status code. When you write an assertion, ask what the *opposite* outcome would produce.
+
+**An `exit` anywhere truncates the suite and still exits 0.** Measured, not assumed: putting an `exit` back into `Application::respond()` made PHPUnit stop after three tests, print **no summary line**, and exit **0**. A gate watching the exit status would call that a pass.
+
+So **read the summary line**, not the exit code — `OK (790 tests, …)` has to be there. This is `exit` meeting PHPUnit rather than anything specific to this code, and it applies anywhere in the suite. `tools/test` does not currently enforce it; it should. See [RespondTest](tests/RespondTest.php) for the measurement.
 
 **A hook with no test is a bug waiting.** `Layout::styles()` appended its return value straight into `<head>`, so returning raw CSS emitted naked text that browsers hoist away and discard — the app rendered unstyled with a 200, and nothing caught it. `View/` had no test file at all. **Add the test with the feature.**
 

@@ -44,7 +44,7 @@ PHP without the extension and has been missed by `find -name '*.php'` before.
 cd principle && composer test
 ```
 
-`783 tests, 1439 assertions` is the current baseline. **If your change adds or
+`790 tests, 1451 assertions` is the current baseline. **If your change adds or
 removes tests, update that number in every document that quotes it** —
 `AGENTS.md`, `CHECKLIST.md`, `ARCHITECTURE.md`, `docs/testing.md`.
 
