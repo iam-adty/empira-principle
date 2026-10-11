@@ -1,6 +1,6 @@
 ---
 name: add-route
-description: Use when adding or changing an Empira route — editing app/routes.php or a RouteRegistrar, adding a controller, declaring path parameters with defaults, creating route groups, adding middleware to a route or group, naming routes for url()->to(), or debugging why a route does not match or returns the wrong one.
+description: Use when adding or changing an Empira route — declaring #[Route] on a Layout or controller method, writing a RouteRegistrar, taking typed path parameters, creating route groups, adding middleware to a route or group, naming routes for url()->to(), or debugging why a route does not match or returns the wrong one.
 ---
 
 # Adding an Empira route
@@ -10,13 +10,49 @@ anything stringable, and the framework normalises it.
 
 ## Declare it
 
+With an attribute — the usual case:
+
 ```php
-// app/routes.php — a returned closure receives the RouteCollection
-return static function (RouteCollection $routes): void {
-    $routes->get('/todos', [TodoController::class, 'index'], 'todos.index')
-            ->get('/todos/{id}', [TodoController::class, 'show'], 'todos.show');
-};
+final class TodoController extends Controller
+{
+    #[Route('/todos', name: 'todos.index')]
+    public function index(): Response { … }
+
+    #[Route('/todos/{id}', name: 'todos.show')]
+    public function show(int $id): Response { … }
+}
 ```
+
+```php
+$app->discover(__DIR__, __NAMESPACE__);   // walk src/, read the attributes
+```
+
+`#[Route]` is repeatable and targets classes and methods, so one class can answer
+several URLs:
+
+```php
+#[Route('/', name: 'home')]
+#[Route('/dashboard', name: 'dash')]
+final class HomeLayout extends Layout { /* … */ }
+```
+
+By hand — for a group, shared middleware, or a route that is not a page:
+
+```php
+final class AppRoutes implements RouteRegistrar
+{
+    public function register(RouteCollection $routes): void
+    {
+        $routes->get('/healthz', static fn(): Response => Response::json(['ok' => true]), 'health');
+    }
+}
+
+// in App::boot()
+$app->registrar(Routing\AppRoutes::class);
+```
+
+**Pages use attributes; everything else uses a registrar.** Giving a health check
+a layout would be a lie.
 
 Handler shapes:
 
@@ -33,17 +69,22 @@ autowired:
 static fn(Request $request, Application $app, int $id) => …
 ```
 
-## Ordering is first-match-wins
+## Ordering
 
-This is the sharp edge. A specific path **must** precede a general one:
+**Discovered routes are sorted** — priority, then fewest parameters, then most
+literal segments, then longest. So `/todos/new` beats `/todos/{id}` no matter
+which file sorts first. Use `priority:` when two routes are genuinely ambiguous.
+
+**A hand-written table is first-match-wins**, because its order is a deliberate
+choice someone wrote down:
 
 ```php
-->get('/todos/new', NewTodo::class);   // specific — first
-->get('/todos/{id}', ShowTodo::class); // general
+$routes->get('/todos/new', NewTodo::class);   // specific — first
+       ->get('/todos/{id}', ShowTodo::class); // general
 ```
 
-Reversed, `/todos/new` is swallowed by `/todos/{id}` — it returns the wrong page
-rather than an error. There is no specificity sort yet (see `SPEC.md`).
+Reversed, `/todos/new` is swallowed by `/todos/{id}` — the wrong page, not an
+error.
 
 ## Path parameters
 
@@ -53,14 +94,34 @@ rather than an error. There is no specificity sort yet (see `SPEC.md`).
 ->get('/n/{id:[0-9]+}', …)        // constrained
 ```
 
-A captured segment arrives as a **string**. Type it with `defaults`:
+A captured segment arrives as a **string**. A discovered route types it with the
+signature:
+
+```php
+#[Route('/todos/{id}', name: 'todos.show')]
+public function show(int $id): Response { … }
+```
+
+A hand-written handler uses `defaults` instead:
 
 ```php
 ->get('/todos/{id}', $handler, 'todos.show', defaults: ['id' => 0]);   // int $id
 ```
 
-An `int` default → `int`, `float` → `float`, `bool` → `bool`. Attribute routing is
-planned and this workaround disappears with it.
+An `int` default → `int`, `float` → `float`, `bool` → `bool`.
+
+A **Layout** takes parameters in `mount()`, which must be `public`:
+
+```php
+#[Route('/todos/{id}')]
+final class TodoLayout extends Layout
+{
+    public function mount(TodoRepository $todos, int $id): void { … }
+}
+```
+
+Matched parameters also arrive as layout data (`$region->data('id')`); explicit
+`view()` data overrides them.
 
 ## Groups
 
@@ -125,11 +186,12 @@ HttpException::notFound('Gone.');
 | **404** | path not matched, or no fallback registered |
 | **405 + `Allow`** | path matched, method did not |
 | **403** | class not registered, token invalid, or action not declared |
-| **Wrong page** | a general route declared before a specific one |
+| **Wrong page** | a general route declared before a specific one, **in a hand-written table** |
 | **403 on a group** | middleware attached but not executed — verify the dispatcher |
+| **Route never discovered** | file name does not match its class, or the namespace passed to `discover()` is wrong |
 
 ```bash
-php bin/empira route:list --app=path/to/bootstrap.php
+php bin/empira route:list --target=.     # boots src/App.php
 ```
 
 ## Not routes: component action URLs
@@ -149,4 +211,3 @@ see the `add-component` skill.
 
 - `docs/routing.md` — the full routing API
 - `docs/http.md` — Request/Response and middleware
-- `docs/planned-routing.md` — attribute routing, not yet built

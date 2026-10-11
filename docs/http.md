@@ -1,6 +1,6 @@
 # HTTP
 
-> **Status: describes shipped code.** JSON negotiation is [planned](../SPEC.md).
+> **Status: describes shipped code.**
 
 ## Request
 

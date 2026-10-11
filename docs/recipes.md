@@ -102,31 +102,58 @@ Gotchas: `render()` must return `Element|Raw` (a bare string gets escaped);
 
 ## Add a route
 
-```php
-// app/routes.php — returned closure receives the RouteCollection
-return static function (RouteCollection $routes): void {
-    $routes->get('/todos', [TodoController::class, 'index'], 'todos.index');
-};
-```
+The usual case — a controller method declares its own URL:
 
 ```php
 final class TodoController extends Controller
 {
+    #[Route('/todos', name: 'todos.index')]
     public function index(): Response
     {
         return $this->view(TodoLayout::class);
     }
+
+    #[Route('/todos/{id}', name: 'todos.show')]
+    public function show(int $id): Response      // typed by the signature
+    {
+        return $this->view(TodoLayout::class, ['id' => $id]);
+    }
 }
 ```
 
-Type a path parameter with `defaults`:
+Enable it once, in the application:
 
 ```php
-$routes->get('/todos/{id}', [TodoController::class, 'show'], 'todos.show',
-    defaults: ['id' => 0]);        // arrives as int
+$app->discover(__DIR__, __NAMESPACE__);   // src/
 ```
 
-Group shared prefixes and middleware:
+A page declares its URL the same way, on the layout itself:
+
+```php
+#[Route('/', name: 'home')]
+final class HomeLayout extends Layout { /* … */ }
+```
+
+When a URL needs a typed parameter without a controller — a page, say — take it
+in `mount()` instead:
+
+```php
+#[Route('/todos/{id}')]
+final class TodoLayout extends Layout
+{
+    public function mount(TodoRepository $todos, int $id): void
+    {
+        $this->todo = $todos->findOrFail($id);
+    }
+}
+```
+
+Register by hand when it is not a page — an endpoint somebody else calls, a
+group, or shared middleware:
+
+```php
+$app->registrar(Routing\AppRoutes::class);   // a RouteRegistrar
+```
 
 ```php
 $routes->group('/admin', function (RouteCollection $r): void {
@@ -134,7 +161,8 @@ $routes->group('/admin', function (RouteCollection $r): void {
 }, middleware: [RequireAuth::class]);
 ```
 
-**Order matters.** `/todos/new` must be declared before `/todos/{id}`.
+**In a hand-written table, order matters:** `/todos/new` must be declared before
+`/todos/{id}`. Discovered routes are sorted by specificity, so they do not.
 
 ---
 

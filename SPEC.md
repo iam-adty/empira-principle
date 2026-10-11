@@ -6,15 +6,15 @@
 >
 > Shipped behaviour is in [ARCHITECTURE.md](ARCHITECTURE.md) and `docs/`.
 
-Last reviewed: 2026-10-11. Section 2 shipped; section 1 has not been built.
+Last reviewed: 2026-10-11. Sections 1 and 2 have shipped.
 
 ---
 
-## 1. Attribute-based routing `[planned]`
+## 1. Attribute-based routing `[shipped]`
 
 ### The problem
 
-Routing today lives in a `routes.php` file outside `src/`, as a returned closure. Every URL is declared twice — once in the route table, once in the handler — and every page route repeats the same `$app->view(Layout::class, [...])` shape. Route parameters are typed by a workaround (`defaults: ['id' => 0]`) rather than by the handler's own signature.
+Routing lived in a `routes.php` file outside `src/`, as a returned closure. Every URL was declared twice — once in the route table, once in the handler — and every page route repeated the same `$app->view(Layout::class, [...])` shape. Route parameters were typed by a workaround (`defaults: ['id' => 0]`) rather than by the handler's own signature.
 
 ### The design
 
@@ -53,19 +53,24 @@ The signature types the parameter, so `defaults: ['id' => 0]` disappears.
 
 The current sharp edge: `/todos/new` must precede `/todos/{id}`, or the dynamic route swallows it. With discovery that order would come from the filesystem — a silent 404 that reappears when a file is renamed.
 
-So routes get **one specificity sort**, applied uniformly to discovered and explicit routes:
+So **discovered** routes get one specificity sort before they join the table:
 
 1. explicit `priority:` (descending, default 0)
 2. **fewest `{param}` segments first**
 3. most literal segments first
 4. longer pattern first
-5. registration order (stable tiebreak)
+5. registration order (stable tiebreak — PHP 8 guarantees it)
 
-Safe for existing code: equal-specificity routes keep declaration order, so only param-versus-static precedence changes.
+**Only discovered routes are sorted.** A hand-written table keeps the order it
+was written in, because that order is a deliberate choice somebody made visible.
+Sorting it as well would mean a table behaves differently depending on whether
+the application also calls `discover()`, which is a worse surprise than the one
+it fixes. `priority:` is available to either if precedence must be stated
+explicitly.
 
 ### Route names
 
-`name:` is optional. Omitted, it is derived from the class: `Pages\HomeLayout` → `pages.home`, `Controllers\TodoController::show` → `todos.show`, so `url()->to('todos.show')` works immediately.
+`name:` is optional. Omitted, it is derived from the class: `App\Pages\HomeLayout` → `pages.home`, `App\Controllers\TodoController::show` → `controllers.todo.show`, so `url()->to('controllers.todo.show')` works immediately.
 
 **Known risk:** renaming a method silently changes the derived name. Explicit `name:` is the escape hatch.
 
@@ -75,10 +80,12 @@ Safe for existing code: equal-specificity routes keep declaration order, so only
 |---|---|
 | `src/Attributes/Route.php` | the attribute |
 | `src/Routing/RouteRegistrar.php` | interface for explicit registration |
-| `src/Routing/RouteRegistry.php` | scan a directory, extract, sort |
+| `src/Routing/RouteRegistry.php` | scan a directory, extract, derive names |
 | `src/Routing/RouteParams.php` | request-scoped matched parameters |
 
-Plus: `Application::discover()`, `view()` gains parameter merging and `mount()` injection, and the CLI `route:list` boots the real app instead of requiring `routes.php`.
+Plus: `Application::discover()`, `Application::registrar()`, `view()` gains parameter merging and `mount()` injection, and the CLI `route:list` boots the real app instead of requiring a `routes.php`.
+
+Shipped with `tests/RouteDiscoveryTest.php`. The reference `app/` moved in the same change: `routes.php` is deleted, `App\Layout` is now `App\Pages\HomeLayout` with `#[Route('/')]` on the class, and `src/Routing/AppRoutes.php` registers the endpoint that is not a page.
 
 ---
 

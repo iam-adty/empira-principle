@@ -68,16 +68,22 @@ Current: **616 framework tests / 1117 assertions**, **12 app tests / 33 assertio
 
 In priority order. See [SPEC.md](SPEC.md) for the design behind each.
 
-### 1. Attribute routing `[planned]` — the remaining build
-- [ ] `Attributes/Route.php` — `TARGET_CLASS|TARGET_METHOD|IS_REPEATABLE`
-- [ ] `Routing/RouteRegistrar.php`, `RouteRegistry.php`, `RouteParams.php`
-- [ ] Specificity sort (priority → fewest params → most literal → longest → registration)
-- [ ] `Application::discover()`
-- [ ] `view()` merges route params; `mount()` injected by reflection
-- [ ] Auto-derived route names
-- [ ] CLI `route:list` boots the real app
-- [ ] Tests: discovery, ordering, repeatable attribute, mount injection
-- [ ] Migrate `app/` to `#[Route]` and delete `app/routes.php`
+### 1. Attribute routing `[shipped]` — 2026-10-11
+- ~~`Attributes/Route.php` — `TARGET_CLASS|TARGET_METHOD|IS_REPEATABLE`~~
+- ~~`Routing/RouteRegistrar.php`, `RouteRegistry.php`, `RouteParams.php`~~
+- ~~Specificity sort (priority → fewest params → most literal → longest → registration)~~
+- ~~`Application::discover()` and `Application::registrar()`~~
+- ~~`view()` merges route params; `mount()` injected by reflection~~
+- ~~Auto-derived route names~~
+- ~~CLI `route:list` boots the real app~~
+- ~~Tests: discovery, ordering, repeatable attribute, mount injection, middleware, skips~~
+- ~~Migrated `app/` to `#[Route]`; `app/routes.php` deleted~~
+
+**Two bugs the tests caught, both worth remembering.** `commitDiscovered()`
+assigned `usort()`'s return value — which is `true` — to the sorted array, so
+nothing was ever sorted. And the registry skipped abstract classes but not other
+non-instantiable ones, so a `#[Route]` on a class with a private constructor
+registered a URL that could not be built.
 
 ### 2. JSON / API routes — 2026-10-11
 - ~~`Request::accepts()` — real q-value parse; explicit mention beats wildcard~~

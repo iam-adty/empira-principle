@@ -1,7 +1,6 @@
 # Components
 
 > **Status: describes shipped code.** Verified against the current suite.
-> Attribute-based routing is [planned](../SPEC.md).
 
 A component is a class. Its state is a typed property, its behaviour is a
 method, and its `render()` returns an `Element`. Everything htmx-related is

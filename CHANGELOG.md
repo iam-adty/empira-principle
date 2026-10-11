@@ -15,6 +15,27 @@ can change without a major bump, though changes are always documented here.
 
 ### Added
 
+- **`#[Route]` attribute routing.** A `Layout` or controller method can declare
+  its own URL: `#[Route('/todos', name: 'todos.index')]`. Repeatable, and
+  targeting both classes and methods, so one class can answer several URLs.
+- `Application::discover($directory, $namespace)` — scans a directory, maps each
+  file to the class its path implies, and registers what it finds. A file whose
+  class cannot be loaded is reported on `error_log`; abstract, interface, enum
+  and non-instantiable classes are skipped.
+- **Specificity ordering for discovered routes** — priority, then fewest
+  parameters, then most literal segments, then longest. `/todos/new` is matched
+  before `/todos/{id}` regardless of which file sorts first. Hand-written tables
+  keep the order they were written in.
+- `RouteParams` — the matched parameters, request-scoped and bound in the
+  container. They also arrive as layout data, beneath any explicit `view()` data.
+- **`mount()` injection.** A layout or controller method may declare `public
+  function mount(…)` and have matched parameters and autowired services passed
+  in, so `int $id` types itself and `defaults:` is unnecessary.
+- `RouteRegistrar` and `Application::registrar()` — explicit registration for
+  routes that are not pages: groups, shared middleware, endpoints other code
+  calls.
+- `methods:` on `#[Route]` accepts several verbs, registering one route per verb
+  under one name.
 - `Request::accepts()` — a real `Accept` parse with quality values. An explicit
   mention of a media type beats a wildcard; a missing or wildcard-only header
   expresses no preference at all.
@@ -31,9 +52,29 @@ can change without a major bump, though changes are always documented here.
 - `Layout::styles()` now wraps a `Raw` stylesheet in a `<style>` element instead
   of appending it bare into `<head>`, where a browser would hoist it away and
   discard it. An `Element` return value is still used as-is.
+- `RouteCollection` allows two routes to share a name when they differ by method,
+  which is what `methods: ['GET', 'POST']` produces. Two routes for the same
+  verb under one name is still an error.
+- `route:list` with no `--app` boots `src/App.php` in the target directory, so
+  it prints the table the application really serves. It loads the project's own
+  `vendor/autoload.php` first. `--app=path.php` still accepts a file returning an
+  `Application`, a `RouteCollection`, or a closure.
+- A layout's `mount()` must be `public`. A non-public one now raises a
+  `LogicException` naming the class, rather than a bare `TypeError`.
 
 ### Fixed
 
+- **Discovered routes were never sorted.** `commitDiscovered()` assigned
+  `usort()`'s return value — a `bool` — to the array it was meant to hold, so
+  the specificity sort silently did nothing.
+- **A `#[Route]` on a non-instantiable class registered a URL that could not be
+  built.** The registry skipped abstract classes but not other classes that
+  cannot be constructed, so a private constructor produced a route that failed
+  at request time instead of being skipped at boot.
+- **Route parameters leaked between requests.** An `Application` outlives the
+  request in tests and long-running workers, and `RouteParams` was bound with
+  `??=`, so `/todos/7` left its `id` behind for a later request that matched
+  nothing.
 - **`ValidationException` is mapped in `renderException()`.** It fell through to
   500 and, not being an `HttpException`, was rethrown — so `throw new
   ValidationException($bag)` produced an uncaught fatal rather than a 422, despite

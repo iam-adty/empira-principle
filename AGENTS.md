@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `616 tests, 1117 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `637 tests, 1160 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -31,7 +31,7 @@ There is no CI config yet. **The test suite is the only gate** — run it before
 
 ## Where things live
 
-69 source files across 13 namespaces. The 16 files at `src/` root are the core; everything else is a subsystem.
+74 source files across 13 namespaces. The 16 files at `src/` root are the core; everything else is a subsystem.
 
 | Path | Responsibility |
 |---|---|
@@ -46,10 +46,10 @@ There is no CI config yet. **The test suite is the only gate** — run it before
 | `src/TokenCodec.php` | HMAC-signed component identity (`base64url(payload).base64url(hmac)`) |
 | `src/Router.php` | Resolves an action URL back to a component and runs the action |
 | `src/functions.php` | The global `hx()` helper |
-| `src/Attributes/` | `Prop`, `Action`, and the verb markers `Get`/`Post`/`Put`/`Patch`/`Delete` |
+| `src/Attributes/` | `Prop`, `Action`, `Route`, and the verb markers `Get`/`Post`/`Put`/`Patch`/`Delete` |
 | `src/State/` | `StateStore` + implementations, `PropBag` (typed prop hydration), `ActionMap` |
 | `src/Http/` | `Request`, `Response`, `Session`, `Middleware`, `Pipeline` |
-| `src/Routing/` | `Route`, `RouteCollection`, `UrlGenerator`, `Controller`, `HttpException` |
+| `src/Routing/` | `Route`, `RouteCollection`, `RouteRegistry` (attribute discovery), `RouteParams`, `RouteRegistrar`, `UrlGenerator`, `Controller`, `HttpException` |
 | `src/View/` | `Layout`, `Region` — the page shell and its swappable areas |
 | `src/Container/` | Autowiring service container |
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
@@ -101,7 +101,16 @@ Note what this is *not*: `render()` is declared `Element|Raw|string`, and `Compo
 
 **A hook with no test is a bug waiting.** `Layout::styles()` appended its return value straight into `<head>`, so returning raw CSS emitted naked text that browsers hoist away and discard — the app rendered unstyled with a 200, and nothing caught it. `View/` had no test file at all. **Add the test with the feature.**
 
-**Route matching is first-match-wins.** `RouteCollection` iterates in declaration order, so `/todos/new` must be registered before `/todos/{id}` or the dynamic route swallows it. There is no specificity sort yet (see [SPEC.md](SPEC.md)).
+**Route matching depends on where the route came from.** A **hand-written**
+table is first-match-wins, so `/todos/new` must be declared before `/todos/{id}`
+or the dynamic route swallows it — the order is a deliberate choice and is
+preserved. **Discovered** routes are sorted by specificity before joining the
+table, because their order would otherwise come from the filesystem. Do not
+"fix" the sort into `register()` and change every existing table's behaviour.
+
+**`usort()` returns `bool`.** It has already happened here: `commitDiscovered()`
+assigned its return value to the array it was meant to hold, so nothing was ever
+sorted and every ordering test failed at once. Sort into a variable, then use it.
 
 **`Container::singleton()` takes a class-string or factory, never an object.** The signature is `callable|string|null`. Pre-built objects go through `instance()`; passing one is a `TypeError`.
 

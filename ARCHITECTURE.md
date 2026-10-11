@@ -117,7 +117,11 @@ $routes->get('/todos/new', NewTodo::class);   // specific — must come first
 $routes->get('/todos/{id}', ShowTodo::class); // general — catches the rest
 ```
 
-The sharp edge is that the order is yours to maintain. A specificity sort is [planned](SPEC.md).
+The order above is a hand-written table, so it is the author's to maintain. Routes
+**discovered** from `#[Route]` attributes have no such order to inherit — it would
+come from the filesystem — so they are sorted by specificity before joining the
+table: `/todos/new` beats `/todos/{id}` because it has fewer parameters. See
+[docs/routing.md](docs/routing.md#ordering-discovered-routes).
 
 ## Middleware is onion-shaped
 
@@ -130,9 +134,13 @@ Each layer runs before the handler and again after it, which is what lets a laye
 
 ## Content negotiation
 
-Today the framework is HTML-only for pages: `Layout::render()` returns a full document to a browser and a single region to htmx (detected via `HX-Request`, with boosted links treated as real navigations).
+For pages, the framework is HTML-only: `Layout::render()` returns a full document to a browser and a single region to htmx (detected via `HX-Request`, with boosted links treated as real navigations).
 
-JSON responses for non-htmx clients are [planned](SPEC.md), including a single error envelope. The design decisions for that are already made; nothing is built yet.
+Errors are different. A client that explicitly asks for JSON with
+`Accept: application/json` gets a single `{"error": {…}}` envelope and the right
+status code, while everything else stays HTML. The rule that makes this safe is
+that **htmx sends no `Accept` header at all**, so a wildcard resolves to HTML —
+see [docs/json-errors.md](docs/json-errors.md).
 
 ## Testing strategy
 
