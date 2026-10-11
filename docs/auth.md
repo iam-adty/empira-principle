@@ -1,6 +1,6 @@
 # Auth
 
-> **Status: describes shipped code.** Verified against `771 tests, 1413
+> **Status: describes shipped code.** Verified against `783 tests, 1439
 > assertions`.
 
 The framework knows **who is asking**. It does not know what a user is, where

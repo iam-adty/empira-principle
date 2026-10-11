@@ -284,6 +284,47 @@ A structural component with no appearance of its own should return an empty
 `Raw` — a form composes `FormField`s and owns their styling, and a `<style>` on
 each field would repeat once per field per form.
 
+## Aggregating a composite's styles
+
+A composite emits **one** sheet for its whole subtree instead, when it says so:
+
+```php
+protected function aggregateStyles(): ?StyleOrder
+{
+    return StyleOrder::SelfLast;
+}
+```
+
+Three things come out of that. Identical rulesheets are emitted once rather than
+once per instance, so five children of a class cost one rule block. The composite
+decides where its own rules sit among its children's, which positional insertion
+never let it do. And the parent can style its children's internals as a unit.
+
+**The order nobody chose.** A parent prepends its sheet to its own root while its
+children's already sit inside them, so the parent's rules land *first* — and CSS
+gives the last of two equal rules the win, which means **children win a tie**.
+`StyleOrder::SelfFirst` preserves that, so opting in does not silently reorder an
+application. `SelfLast` is for a parent whose purpose is to dress its children.
+
+**The cost, and the promise.** A child swapped on its own would arrive unstyled,
+because its rules have moved up to a root that was not swapped. Say so:
+
+```php
+protected function swapsIndependently(): bool
+{
+    return true;   // I keep my own sheet, even inside an aggregating parent
+}
+```
+
+It then keeps its sheet *and* is left out of the parent's, so its rules appear
+once and travel with every swap of it. The framework cannot check this — a
+component that self-swaps and does not say so simply arrives unstyled, and
+nothing reports it. That is why the default is the safe one.
+
+Anything rendered on its own is unaffected. `lazy()` fetches through an action,
+so that render pass has no aggregating parent, and the component emits its own
+sheet — which is right, because anything fetched alone has to stand alone.
+
 ## Further reading
 
 - [SECURITY.md](../SECURITY.md) — the token model in full

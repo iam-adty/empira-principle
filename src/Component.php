@@ -89,6 +89,20 @@ abstract class Component
      */
     private array $children = [];
 
+    /**
+     * An aggregating ancestor owns this component's rules, so it emits no sheet.
+     *
+     * Set by {@see child()} on the instance, after `prepare()` and before
+     * anything renders — the only window where it can still be true.
+     */
+    private bool $stylesHoisted = false;
+
+    /** True when this component collects its children's styles. */
+    private bool $aggregating = false;
+
+    /** True when its own rules should follow its children's. */
+    private bool $selfLastStyles = false;
+
     /** The id that default `hx-target` attributes aim at. */
     private string $targetId;
 
@@ -145,6 +159,10 @@ abstract class Component
      */
     final public function markup(): Element|Raw
     {
+        // Before `render()`, which is what creates the children whose hoisting
+        // depends on this decision.
+        $this->prepareForRender();
+
         $rendered = $this->render();
 
         if ($rendered instanceof Element) {
@@ -157,7 +175,7 @@ abstract class Component
                 $rendered->id($this->targetId);
             }
 
-            $style = $this->styleElement();
+            $style = $this->aggregating ? $this->collectedStyleElement() : $this->ownStyleElement();
 
             if ($style !== null) {
                 $rendered->prepend($style);
@@ -168,7 +186,7 @@ abstract class Component
 
         // A component that renders raw markup rather than an element still gets
         // its styling, prefixed as text — there is no element to prepend to.
-        $style = $this->styleElement();
+        $style = $this->aggregating ? $this->collectedStyleElement() : $this->ownStyleElement();
         $css = $style instanceof Raw ? $style->get() : ($style?->render() ?? '');
 
         if ($rendered instanceof Raw) {
@@ -179,17 +197,155 @@ abstract class Component
     }
 
     /**
-     * This component's own styling, emitted inside its root element.
+     * This component's own `<style>`, or null when it has none **or** an
+     * aggregating ancestor owns its rules.
+     */
+    private function ownStyleElement(): Element|Raw|null
+    {
+        return $this->stylesHoisted ? null : $this->styleElement();
+    }
+
+    /**
+     * One `<style>` for this component's whole subtree.
      *
-     * The alternative is one stylesheet in `<head>` shared by every component,
-     * which makes the sheet a list of everyone's private rules and means a
-     * component cannot be lifted out with its appearance intact.
+     * Walks the component tree rather than the markup: {@see Element} has no
+     * children accessor, and the instances are here anyway. Only children that
+     * were hoisted count — one that {@see swapsIndependually()} kept its own
+     * sheet, and collecting it as well would put the same rules on the page twice.
+     */
+    private function collectedStyleElement(): Element|Raw|null
+    {
+        $parts = [];
+
+        $own = $this->styles();
+        $own = $own instanceof Element ? $own->render() : $own->get();
+
+        if ($own !== '') {
+            $parts[] = $own;
+        }
+
+        foreach ($this->children as $child) {
+            if ($child->stylesHoisted) {
+                $parts[] = $child->contributeStyles();
+            }
+        }
+
+        // Identical rules, once. Five children of one class are one rule block,
+        // which is the whole reason a composite bothers to collect.
+        $parts = array_values(array_unique(array_filter($parts, static fn(string $s): bool => trim($s) !== '')));
+
+        if ($this->selfLastStyles) {
+            $parts = array_reverse($parts);
+        }
+
+        $css = implode("\n", $parts);
+
+        return $css === '' ? null : $this->hx->style()->raw($css);
+    }
+
+    /**
+     * This component's stylesheet and its hoisted descendants', as CSS.
      *
-     * Inside the root element is the point. The root element is the swap
-     * target, so the `<style>` arrives again with every swap htmx performs —
+     * Recurses so a grandchild is reached without the root knowing how deep the
+     * tree goes.
+     *
+     * @internal read by an aggregating parent
+     */
+    protected function contributeStyles(): string
+    {
+        $parts = [];
+        $own = $this->styles();
+        $own = $own instanceof Element ? $own->render() : $own->get();
+
+        if ($own !== '') {
+            $parts[] = $own;
+        }
+
+        foreach ($this->children as $child) {
+            if ($child->stylesHoisted) {
+                $parts[] = $child->contributeStyles();
+            }
+        }
+
+        return implode("\n", $parts);
+    }
+
+/**
+ * Collect this component's stylesheet and its children's into one sheet at this
+ * component's root. Returning null — the default — and nothing changes.
+ *
+ * Every component carries its own sheet inside its own root element, because the
+ * root is the swap target and a sheet in `<head>` does not travel with a swap.
+ * That is right for a component that is swapped on its own, and repetitive for
+ * one composed of others: five children of a class would emit five identical
+ * `<style>` blocks, and the parent would have no say in the order they landed
+ * in.
+ *
+ * Opting in says the composite is the swap unit — its whole subtree arrives and
+ * leaves together — so the CSS can be gathered at the top:
+ *
+ *     protected function aggregateStyles(): ?StyleOrder
+ *     {
+ *         return StyleOrder::SelfLast;
+ *     }
+ *
+ * Identical rulesheets are emitted once, not once per instance.
+ *
+ * **The order you get today was never chosen.** A parent prepends its sheet to
+ * its own root, its children's sheets already sit inside the children, so the
+ * parent's rules land *first* — and CSS gives the last of two equal rules the
+ * win, which means children win. `SelfFirst` preserves that, so opting in does
+ * not silently reorder an application; `SelfLast` is for a parent whose purpose
+ * is to dress its children.
+ *
+ * **The promise.** A child swapped on its own would arrive unstyled, because its
+ * rules have moved up to a root that was not swapped. Declare
+ * {@see swapsIndependently()} on such a child; it keeps its own sheet and is not
+ * collected.
+ *
+ * Anything rendered on its own is unaffected. `lazy()` fetches through an action,
+ * so that render pass has no aggregating parent and the component emits its own
+ * sheet — which is right, because anything fetched alone has to stand alone.
+ */
+protected function aggregateStyles(): ?StyleOrder
+{
+    return null;
+}
+
+/**
+ * I am swapped on my own, so my stylesheet stays inside me.
+ *
+ * False by default, and only meaningful inside a component that answers `true`
+ * to {@see aggregateStyles()}: it then keeps its own sheet *and* is left out of
+ * the parent's, so the rules appear once and travel with every swap of this
+ * component.
+ *
+ * The framework cannot check this. A component that self-swaps and does not say
+ * so gets unstyled markup after the swap, and nothing reports it — which is why
+ * the default is the safe one and the declaration is the author's promise.
+ */
+protected function swapsIndependently(): bool
+{
+    return false;
+}
+
+/**
+ * This component's own styling, emitted inside its root element.
+ *
+ * The alternative is one stylesheet in `<head>` shared by every component,
+ * which makes the sheet a list of everyone's private rules and means a
+ * component cannot be lifted out with its appearance intact.
+ *
+ * Inside the root element is the point. The root element is the swap
+ * target, so the `<style>` arrives again with every swap htmx performs —
      * put it in `<head>` and a component re-fetched on its own would arrive
      * unstyled. It is prepended rather than appended so it wins on order
-     * against a global sheet it is meant to override.
+     * against a global sheet it is meant to override — and, with
+     * {@see aggregateStyles()} returning `null`, a child's sheet also wins on
+     * order against its parent's, which is what this has always done.
+     *
+     * An aggregating composite emits one sheet for the whole subtree instead;
+     * {@see StyleOrder} covers where its own rules go among its children's.
      *
      *     protected function styles(): Raw
      *     {
@@ -636,9 +792,37 @@ protected function child(string $class, array $props = []): Component
 
     $instance->prepare($props);
 
+    // Decided after `prepare()` and before anything renders, which is the only
+    // window where it can still be true. A child that self-swaps keeps its own
+    // sheet *and* is left out of ours, so its rules appear once and travel with
+    // every swap of it.
+    if ($this->aggregating && !$instance->swapsIndependently()) {
+        $instance->stylesHoisted = true;
+    }
+
     $this->children[] = $instance;
 
     return $instance;
+}
+
+/**
+ * Run `render()`, having first decided whether this component's stylesheet is
+ * its own to emit or its subtree's to collect.
+ *
+ * Separate from {@see markup()} so the decision is made once per render, before
+ * any child exists — a child's hoisting depends on it, and `render()` is what
+ * creates the children.
+ *
+ * @internal called by `markup()`
+ */
+final public function prepareForRender(): void
+{
+    // One call. A user's method need not be idempotent, and reading two flags
+    // should not mean asking twice.
+    $order = $this->aggregateStyles();
+
+    $this->aggregating = $order !== null;
+    $this->selfLastStyles = $order === StyleOrder::SelfLast;
 }
 
 /**

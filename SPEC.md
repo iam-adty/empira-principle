@@ -300,3 +300,58 @@ be replayed, never minted.
 - `src/Application.php` — `components()`
 - `src/Component.php` — `prepare()`, `child()`, `children()`
 - `tests/RegistryTest.php`, `tests/CompositionTest.php`
+
+---
+
+## 6. Aggregated styles `[shipped]`
+
+### The problem
+
+Every component emitted a `<style>` inside its own root element, because the
+root is the swap target and a sheet in `<head>` does not travel with a swap.
+Correct for a component fetched alone, repetitive for a composite: five children
+of one class meant five identical rule blocks, and the parent had no say in the
+order its rules landed in.
+
+That order was never chosen. A parent prepends its sheet to its own root while
+its children's already sit inside them, so the parent's rules land *first* — and
+CSS gives the last of two equal rules the win, which means **children win a
+tie**. Any implementation of aggregation had to choose what to do with that.
+
+### The design
+
+**A composite may gather its subtree's CSS into one sheet at its own root.**
+Returning `null` — the default — changes nothing.
+
+```php
+protected function aggregateStyles(): ?StyleOrder
+{
+    return StyleOrder::SelfLast;
+}
+```
+
+`StyleOrder::SelfFirst` preserves the inherited order so opting in cannot
+silently reorder an application; `SelfLast` is for a parent that dresses its
+children. The walk is over the *component* tree rather than the markup, because
+`Element` has no children accessor and the instances are held anyway.
+
+### The cost
+
+A child swapped on its own would arrive unstyled, its rules having moved up to a
+root that was not swapped. `swapsIndependently()` declares the opposite, and such
+a child is *excluded* from collection rather than duplicated — the rules appear
+once and travel with every swap of it.
+
+The framework cannot check that declaration. A component that self-swaps and
+does not say so arrives unstyled after a swap and nothing reports it, which is
+why the default is the safe one.
+
+Anything rendered on its own is unaffected: `lazy()` fetches through an action,
+so that render pass has no aggregating parent.
+
+### Files
+
+- `src/StyleOrder.php` — the enum
+- `src/Component.php` — `aggregateStyles()`, `swapsIndependently()`, `child()`
+  hoisting, `collectedStyleElement()`, `contributeStyles()`
+- `tests/StyleAggregationTest.php`, `tests/Fixtures/Styles.php`

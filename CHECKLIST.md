@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **771 framework tests / 1413 assertions**, **24 app tests / 76 assertions**.
+Current: **783 framework tests / 1439 assertions**, **24 app tests / 76 assertions**.
 
 ---
 
@@ -71,6 +71,12 @@ Current: **771 framework tests / 1413 assertions**, **24 app tests / 76 assertio
 - ~~`Component::child()` returns the child; `children()` reports what was composed~~
 - ~~A nested component needs no registration — the 404 trap is gone~~
 - ~~`renderComponent()` is shorthand for `child()->markup()`~~
+
+### Aggregated styles — 2026-10-11
+- ~~`aggregateStyles()` — one sheet for a composite's whole subtree~~
+- ~~`StyleOrder` — where a composite's rules sit among its children's~~
+- ~~Identical rulesheets once per page, not once per instance~~
+- ~~`swapsIndependently()` — a child that keeps its own sheet and is not collected~~
 
 ### Long-running workers — 2026-10-11
 - ~~`Session::beginRequest()` resets between requests; five tests fail without it~~

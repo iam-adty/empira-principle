@@ -44,6 +44,24 @@ can change without a major bump, though changes are always documented here.
 
   A component may be composed without ever registering it, which is what makes
   nesting free.
+- **`aggregateStyles()` — one stylesheet for a composite's whole subtree.**
+  Returning a `StyleOrder` gathers this component's CSS and its children's into
+  a single `<style>` at its root: identical rulesheets once rather than once per
+  instance, and the composite's own rules placed deliberately among its
+  children's rather than wherever positional insertion happened to put them.
+  `null`, the default, changes nothing.
+
+  `StyleOrder` exists because the order the framework produced was never chosen.
+  A parent prepends its sheet while its children's sit inside them, so the
+  parent's rules land first — and CSS gives the last of two equal rules the win,
+  meaning children win a tie. `SelfFirst` preserves that so opting in does not
+  silently reorder an application; `SelfLast` is for a parent that dresses its
+  children.
+
+  A child swapped on its own would arrive unstyled once its rules move up, so
+  `swapsIndependently()` declares the opposite: it keeps its own sheet *and* is
+  left out of the parent's, so the rules appear once and travel with every swap.
+  The framework cannot check this, which is why the default is the safe one.
 - **A component may carry its own stylesheet.** `Component::styles()` is emitted
   inside the component's root element — which is the swap target — so the CSS
   arrives again with every htmx swap. A sheet in `<head>` would be gone the
