@@ -7,6 +7,14 @@
 # that means nothing, so the services are checked, started, and waited on —
 # and if they cannot be started, this stops and says so rather than reporting
 # a pass.
+#
+# And a green exit status means the suite *finished*. PHPUnit chooses that
+# status in ShellExitCodeCalculator, which nothing reaches if the process exits
+# first — so an `exit` anywhere in the code under test truncates the run, prints
+# no summary, and exits 0. Measured, not assumed: a fixture with an `exit` in
+# it stopped the suite after three tests and still returned success. Hence the
+# summary check below, which is the only thing standing between that and a gate
+# that means nothing.
 
 set -euo pipefail
 
@@ -76,6 +84,38 @@ fi
 # built. Without this, adding a fixture file means the runner cannot find the
 # class, and the only cure is a rebuild, which contradicts mounting the source
 # so that an edit needs no rebuild in the first place.
-exec docker compose run --name empira-principle --rm php \
-    sh -c 'composer dump-autoload --no-interaction --quiet && exec vendor/bin/phpunit "$@"' \
-    _ "$@"
+#
+# `--colors=never` because phpunit.xml asks for colours and the summary check
+# below would be matching ANSI escape codes instead of a line of text.
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
+
+# `set -e` would abandon the pipeline the moment PHPUnit returned non-zero,
+# taking the summary check with it, so the status is captured instead.
+status=0
+docker compose run --name empira-principle --rm php \
+    sh -c 'composer dump-autoload --no-interaction --quiet && exec vendor/bin/phpunit --colors=never "$@"' \
+    _ "$@" 2>&1 | tee "$log" || status=${PIPESTATUS[0]}
+
+if [ "$status" -ne 0 ]; then
+    exit "$status"
+fi
+
+# PHPUnit reached its end and reported. `OK (...)` is a clean run and
+# `Tests: ...` is a run with failures — but the latter already exited non-zero
+# above, so at this point the absence of either means the process ended early.
+if ! grep -qE '^(OK|Tests:)' "$log"; then
+    cat >&2 <<'MESSAGE'
+
+The suite did not finish.
+
+PHPUnit exited successfully but printed no summary, which means the PHP process
+ended before PHPUnit's exit code was calculated — an `exit` or `die` somewhere in
+the code under test, or a fatal error with the exit status swallowed.
+
+The run above is truncated: some tests never ran. Anything asserted about "the
+suite passes" from this run is void.
+
+MESSAGE
+    exit 1
+fi

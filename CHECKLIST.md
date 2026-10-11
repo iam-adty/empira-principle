@@ -74,6 +74,8 @@ Current: **790 framework tests / 1451 assertions**, **24 app tests / 76 assertio
 
 ### Runtime entry points — 2026-10-11
 - ~~`Application::respond()` — the worker's `send()`, without the exit~~
+- ~~The gate cannot be passed by a run that did not finish~~
+- ~~`failOnEmptyTestSuite` — a suite that ran nothing is a failure~~
 
 ### Aggregated styles — 2026-10-11
 - ~~`aggregateStyles()` — one sheet for a composite's whole subtree~~
@@ -165,11 +167,6 @@ header at all**, so a wildcard resolves to HTML. Verified against
   `beginRequest()` contradicts. At 2 × CPU a deferred write-back would lose a
   sign-in 31 times in 32. Design, evidence and the fix:
   [SPEC.md §4](SPEC.md#4-explicit-session-write-back-planned).
-- **`tools/test` does not enforce that the suite completed.** An `exit`
-  anywhere truncates PHPUnit mid-run and it still exits **0**, so a gate watching
-  the exit status can report a pass having run a fraction of the tests. Measured,
-  recorded in AGENTS.md's known traps; `tools/test` should assert the summary
-  line is present. Not done.
 - **Session isolation is only probabilistically checked at the default.** The
   stack ships 2 × CPU workers, and `verify` no longer pins one, so a per-worker
   state leak surfaces only when two consecutive requests for one session land on

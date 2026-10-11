@@ -159,6 +159,23 @@ can change without a major bump, though changes are always documented here.
 
 ### Fixed
 
+- **The suite could pass having run almost none of itself.** PHPUnit chooses its
+  exit status in `ShellExitCodeCalculator`, which nothing reaches if the process
+  exits first — so an `exit` or `die` in the code under test truncated the run,
+  printed no summary, and still returned **0**. Measured rather than suspected: a
+  fixture with an `exit` in it stopped the run after 21 of 790 tests and
+  `composer test` reported success.
+
+  Half of it is a setting: `failOnEmptyTestSuite="true"` in `phpunit.xml` makes a
+  suite that matched nothing a failure, which it had not been. The other half
+  cannot be a setting, because no PHPUnit flag is reached. `tools/test` captures
+  the output and refuses a run with no summary line, which is the only thing that
+  can tell a finished run from a truncated one. `tee` keeps the suite streaming,
+  so nothing is lost to find out late.
+
+  The habit that survives is simpler than the mechanism: read the summary line,
+  not the exit status.
+
 - **A request never handed the session back.** `handle()` opened the session and
   never closed it, leaving the write-back to happen at the start of whatever
   request this worker served *next* — which, at the 32 workers the reference

@@ -33,7 +33,10 @@ GitHub Actions only executes for a repository hosted on GitHub.
 
 `tools/test` starts the database if it is down and **refuses to run** if it
 cannot — a suite that quietly skipped the driver tests is a green tick that
-proves nothing.
+proves nothing. It also refuses a run that **finished early**: PHPUnit's own exit
+status cannot report truncation, so the script checks that a summary line was
+printed. That check is why `composer test` means what it says — read
+[`Fixed`](#fixed--do-not-reintroduce) for the measurement behind it.
 
 ## Where things live
 
@@ -145,10 +148,6 @@ Note what this is *not*: `render()` is declared `Element|Raw|string`, and `Compo
 
 **A test can pass while asserting nothing.** `AppTest` once asserted `assertStringContainsString('htmx', $body)` — which matched `class="htmx-indicator"` in the layout and would have passed whatever the search returned. **Assert on something that can only appear if the behaviour worked**: a specific `<li>`, an exact attribute, a status code. When you write an assertion, ask what the *opposite* outcome would produce.
 
-**An `exit` anywhere truncates the suite and still exits 0.** Measured, not assumed: putting an `exit` back into `Application::respond()` made PHPUnit stop after three tests, print **no summary line**, and exit **0**. A gate watching the exit status would call that a pass.
-
-So **read the summary line**, not the exit code — `OK (790 tests, …)` has to be there. This is `exit` meeting PHPUnit rather than anything specific to this code, and it applies anywhere in the suite. `tools/test` does not currently enforce it; it should. See [RespondTest](tests/RespondTest.php) for the measurement.
-
 **A hook with no test is a bug waiting.** `Layout::styles()` appended its return value straight into `<head>`, so returning raw CSS emitted naked text that browsers hoist away and discard — the app rendered unstyled with a 200, and nothing caught it. `View/` had no test file at all. **Add the test with the feature.**
 
 **Route matching depends on where the route came from.** A **hand-written**
@@ -179,6 +178,12 @@ That is what `$app->use(new Middleware(...))` does to a middleware's `Format`
 and `Auth`. Pass the class-string; the pipeline rebuilds it per request.
 
 ### Fixed — do not reintroduce
+
+**The suite could report success having run almost nothing.** PHPUnit picks its exit status in `ShellExitCodeCalculator`, which nothing reaches if the process exits first — so an `exit` anywhere in the code under test truncated the run, printed no summary, and returned **0**. Measured: a fixture with an `exit` in it stopped the suite after 21 tests and `composer test` still succeeded.
+
+Two halves, because they are different failures. `failOnEmptyTestSuite="true"` in `phpunit.xml` covers *nothing ran* — a filter or a broken autoloader used to exit 0 too. `tools/test` covers *stopped early*: it captures the output and refuses a run with no summary line. Verified by planting an `exit` in a fixture and getting a non-zero status, then reverting. Live streaming is preserved with `tee`.
+
+The habit that survives: **read the summary line, not the exit status.** Any exit anywhere still truncates, and only `tools/test` stands between that and a gate that means nothing.
 
 **`Response::html()` used to discard a second argument.** PHP silently drops extra arguments to a function that does not declare them, so `Response::html('x', 406)` returned a 200. Fixed in `456b960` — it now takes `$status`. Still worth knowing when a status quietly goes missing.
 
