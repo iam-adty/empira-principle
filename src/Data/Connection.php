@@ -112,6 +112,20 @@ final class Connection
     }
 
     /**
+     * Drop the recorded statements.
+     *
+     * A worker opens one Connection and keeps it for the life of the process, so
+     * the log is every statement that process has ever run — a leak that only
+     * shows up once you have served more than a handful of requests. The
+     * framework clears it between requests; it is public for anything else
+     * holding a long-lived connection that wants the memory back sooner.
+     */
+    public function forgetQueries(): void
+    {
+        $this->log = [];
+    }
+
+    /**
      * Run a statement for its side effect and report how many rows it touched.
      *
      * @param array<int, mixed> $bindings

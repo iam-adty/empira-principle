@@ -118,6 +118,36 @@ final class Session implements SessionId
         }
     }
 
+    /**
+     * Release the PHP session so the next request in this process opens its own.
+     *
+     * A session is process-wide, and a long-running worker outlives the request
+     * that opened one. PHP does not follow the request boundary for you: the
+     * session id stays bound and `$_SESSION` stays populated, so the next
+     * request reads and writes the previous visitor's data and `regenerate()`
+     * defends the wrong id. Closing costs one write to the session store and is
+     * the only thing between a worker and a cross-user data leak.
+     *
+     * A no-op under the CLI, where there is nothing to close: `$_SESSION` is an
+     * in-process array standing in for a session, and a test driving two
+     * requests through one Application is relying on it surviving between them.
+     * That is also why `begin()` only ever rotates the flash buckets once per
+     * instance — under a worker the instance is per request, because
+     * `Application::handle()` binds a new one.
+     */
+    public static function detach(): void
+    {
+        if (PHP_SAPI === 'cli') {
+            return;
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        $_SESSION = [];
+    }
+
     private function begin(): void
     {
         // The session is prepared once per instance — and an instance is

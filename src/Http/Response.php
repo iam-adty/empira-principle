@@ -331,7 +331,16 @@ final class Response
      * A streamed file is read in chunks rather than loaded whole, so
      * downloading a large file costs no memory.
      */
-    public function send(): never
+    /**
+     * Write this response to the client without terminating the process.
+     *
+     * A classic runtime ends here: `send()` emits and exits, because there is
+     * one request per process. A worker must not — an `exit` would take the
+     * worker down with it, and FrankenPHP would restart it, giving exactly one
+     * request per boot and none of the reason to run a worker. That is the
+     * whole difference between the two, and it is why this method exists.
+     */
+    public function emit(): void
     {
         if (!headers_sent()) {
             http_response_code($this->status);
@@ -352,10 +361,21 @@ final class Response
                 fclose($handle);
             }
 
-            exit;
+            return;
         }
 
         echo $this->body;
+    }
+
+    /**
+     * Emit the response and end the script.
+     *
+     * Declared `never` so a classic front controller can call it as its last
+     * statement without the analyser wondering what runs after the `exit`.
+     */
+    public function send(): never
+    {
+        $this->emit();
 
         exit;
     }

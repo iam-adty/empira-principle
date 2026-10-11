@@ -114,8 +114,6 @@ final class Application
         if ($csrf !== null) {
             $this->container->instance(Csrf::class, $csrf);
         }
-
-        $this->container->singleton(Session::class, static fn(Container $container): Session => new Session());
     }
 
     /**
@@ -306,6 +304,15 @@ final class Application
      */
     public function handle(Request $request): Response
     {
+        // An Application outlives the request in a long-running worker, and the
+        // session is the one piece of state where that outlives *wrongly* — see
+        // Session::detach(), which is why the reason lives there.
+        Session::detach();
+
+        // Likewise the connection: one is opened at boot and kept, so its
+        // statement log would otherwise grow for as long as the process lives.
+        $this->db?->connection()->forgetQueries();
+
         $context = $this->makeContext($request);
         $this->context = $context;
 
@@ -329,14 +336,25 @@ final class Application
         // Per request, not per application: see auth().
         $this->container->instance(Auth::class, new Auth($this->guards, $request));
 
+        // Per request for the same reason, and it is not enough to reset the
+        // object — the latch inside it decides whether the flash buckets rotate,
+        // and a latched Session is a Session that will never rotate again.
+        $this->container->instance(Session::class, new Session());
+
         try {
-            return $this->pipeline->send(
+            $response = $this->pipeline->send(
                 $request,
                 fn(Request $request): Response => $this->dispatch($request, $context)
             );
         } catch (\Throwable $e) {
-            return $this->renderException($e, $request, $context->response);
+            $response = $this->renderException($e, $request, $context->response);
+        } finally {
+            // A context outliving its request is how `view()` outside a dispatch
+            // ends up mutating a response that has already been sent.
+            $this->context = null;
         }
+
+        return $response;
     }
 
     /**
@@ -541,6 +559,14 @@ final class Application
 
     /**
      * Add middleware that runs for every request.
+     *
+     * Pass the **class-string** wherever you can. The pipeline rebuilds a
+     * class-string for every request, so it picks up that request's `Format`,
+     * `Auth` and container bindings. An instance is built once at boot and reused
+     * unchanged, which under a long-running worker freezes whatever the first
+     * request happened to hold: a `Format` pinned to HTML answers a JSON client
+     * with a page, and an `Auth` built for request one decides who request two
+     * is. Reachable, but only if you hand the pipeline an object.
      *
      * @param class-string<Middleware>|Middleware ...$layers
      */
