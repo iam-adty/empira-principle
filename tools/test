@@ -69,4 +69,13 @@ fi
 #
 # Deliberately no `--build`. The source is mounted from the host, so an edit is
 # an edit in the runner and the image is built once, not per run.
-exec docker compose run --name empira-principle --rm php "$@"
+#
+# The autoloader is regenerated first, in the same container, because
+# `tests/Fixtures/` is **classmapped** rather than PSR-4 — several fixtures share
+# one file — and the classmap in `vendor/` was generated when the image was
+# built. Without this, adding a fixture file means the runner cannot find the
+# class, and the only cure is a rebuild, which contradicts mounting the source
+# so that an edit needs no rebuild in the first place.
+exec docker compose run --name empira-principle --rm php \
+    sh -c 'composer dump-autoload --no-interaction --quiet && exec vendor/bin/phpunit "$@"' \
+    _ "$@"

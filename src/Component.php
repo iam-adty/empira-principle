@@ -78,6 +78,17 @@ abstract class Component
 
     private string $nonce;
 
+    /**
+     * What this component composed, in order.
+     *
+     * Held so a parent can ask; nothing in the framework reads it. It is the
+     * tree that {@see child()} builds, made inspectable rather than flattened
+     * into markup at the point of composition.
+     *
+     * @var list<Component>
+     */
+    private array $children = [];
+
     /** The id that default `hx-target` attributes aim at. */
     private string $targetId;
 
@@ -226,6 +237,23 @@ abstract class Component
      */
     final public function initialise(array $props = []): Element|Raw
     {
+        $this->prepare($props);
+
+        return $this->markup();
+    }
+
+    /**
+     * Everything a component needs before its first render, without rendering it.
+     *
+     * Split out of {@see initialise()} so {@see child()} can hand back a live
+     * component to compose with, rather than a string of already-rendered
+     * markup. A parent that wants to look at a child before deciding what to do
+     * with it now can.
+     *
+     * @internal called by `initialise()` and `child()`
+     */
+    final public function prepare(array $props = []): void
+    {
         $this->props = $props;
 
         if ($this->stateful()) {
@@ -239,8 +267,6 @@ abstract class Component
         if ($this->stateful()) {
             $this->context->state->save($this->stateKey(), $this->exportProps());
         }
-
-        return $this->markup();
     }
 
     /**
@@ -573,14 +599,72 @@ abstract class Component
         $this->context->state->forget($this->stateKey());
     }
 
-    /**
-     * Render a second component from inside this one — handy for composing
-     * a page out of smaller components without any parent knowing their URLs.
-     */
-    protected function renderComponent(string $class, array $props = []): Element|Raw
-    {
-        $instance = new $class($this->context, $props);
+/**
+ * Compose another component and get the component back.
+ *
+ * The Composite idea, taken seriously: a component containing components and a
+ * component that does not are the same kind of thing, and the framework does
+ * not care which is which. There is one type, one render path, one token shape,
+ * one set of rules.
+ *
+ *     $logout = $this->child(LogoutButton::class);
+ *
+ *     return $this->hx->nav()->append($logout->markup());
+ *
+ * What comes back is a live component, so a parent can look at it — its props,
+ * whether it rendered anything, what it composed itself — before deciding where
+ * it goes. {@see children()} then reports everything this component composed,
+ * for the cases where a parent needs the whole set rather than one at a time.
+ *
+ * Two things make this work that used to be the parent's problem. The child's
+ * action URLs carry its own class name, which now resolves through
+ * {@see Application::components()} — so a nested component answers its own
+ * button instead of rendering fine and then 404-ing when pressed, which is what
+ * registering every nested component by hand existed to prevent. And its
+ * stylesheet rides inside its own root element, which is the swap target, so
+ * composition brings its styles with it.
+ *
+ * Props follow the same path they do anywhere else, so a child is given them
+ * the way the router would give them.
+ *
+ * @param class-string<Component> $class
+ */
+protected function child(string $class, array $props = []): Component
+{
+    /** @var Component $instance */
+    $instance = new $class($this->context, $props);
 
-        return $instance->initialise($props);
-    }
+    $instance->prepare($props);
+
+    $this->children[] = $instance;
+
+    return $instance;
+}
+
+/**
+ * Every component this one composed, in the order it composed them.
+ *
+ * Only direct children — ask a child for its own to walk further down, which is
+ * what keeps a tree from having to be flattened into something it is not.
+ *
+ * @return list<Component>
+ */
+protected function children(): array
+{
+    return $this->children;
+}
+
+/**
+ * Render a second component from inside this one — handy for composing
+ * a page out of smaller components without any parent knowing their URLs.
+ *
+ * Shorthand for `child($class, $props)->markup()`. Prefer {@see child()} when
+ * you want the instance rather than the markup.
+ *
+ * @param class-string<Component> $class
+ */
+protected function renderComponent(string $class, array $props = []): Element|Raw
+{
+    return $this->child($class, $props)->markup();
+}
 }
