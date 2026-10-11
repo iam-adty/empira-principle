@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace IamAdty\Empira;
 
+use IamAdty\Empira\Config\Config;
 use IamAdty\Empira\Container\Container;
+use IamAdty\Empira\Data\Connection;
+use IamAdty\Empira\Data\ConnectionFactory;
+use IamAdty\Empira\Data\Db;
 use IamAdty\Empira\Html;
 use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware;
@@ -76,6 +80,8 @@ final class Application
     /** The parameters the current route matched. */
     private ?RouteParams $params = null;
 
+    private ?\IamAdty\Empira\Data\Db $db = null;
+
     public function __construct(
         string $secret,
         private readonly StateStore $state = new NullState(),
@@ -105,6 +111,59 @@ final class Application
         }
 
         $this->container->singleton(Session::class, static fn(Container $container): Session => new Session());
+    }
+
+    /**
+     * Wire a database and make `Db` autowirable from here on.
+     *
+     * Before this, asking the container for `Db` throws: its constructor wants
+     * a `Connection`, which wants a `PDO`, and nothing about a `PDO` can be
+     * guessed. This is the one place the DSN is built, so it is the one place a
+     * driver name is turned into a real handle.
+     *
+     *     $app->database(['driver' => 'sqlite', 'database' => ':memory:']);
+     *
+     *     // …now in any component, controller or middleware:
+     *     public function __construct(private readonly Db $db) {}
+     *
+     * Configuration is taken as an argument or, with none, from `db.*` in the
+     * container's `Config`. Nothing is connected until this is called: an
+     * application that never asks for a database never opens one.
+     */
+    public function database(?array $config = null): self
+    {
+        $items = $config;
+
+        if ($items === null) {
+            $bound = $this->container->bound(Config::class)
+                ? $this->container->get(Config::class)
+                : null;
+
+            $items = $bound instanceof Config ? ($bound->array('db') ?: null) : null;
+        }
+
+        $connection = ConnectionFactory::make(new Config($items ?? []));
+        $db = new Db($connection);
+
+        $this->db = $db;
+        $this->container->instance(Connection::class, $connection);
+        $this->container->instance(Db::class, $db);
+
+        return $this;
+    }
+
+    /**
+     * The database, once {@see Application::database()} has been called.
+     */
+    public function db(): Db
+    {
+        if ($this->db === null) {
+            throw new \LogicException(
+                'No database is configured. Call $app->database() during boot before asking for one.'
+            );
+        }
+
+        return $this->db;
     }
 
     /**

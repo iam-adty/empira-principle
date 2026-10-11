@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace IamAdty\Empira\Console;
 
 use IamAdty\Empira\Console\Commands\MakeComponent;
+use IamAdty\Empira\Console\Commands\Migrate;
 use IamAdty\Empira\Console\Commands\MakeController;
 use IamAdty\Empira\Console\Commands\RouteList;
 use IamAdty\Empira\Console\Commands\Serve;
@@ -38,6 +39,7 @@ final class Application
         $this->commands = [
             'make:component' => new MakeComponent(),
             'make:controller' => new MakeController(),
+            'migrate' => new Migrate(),
             'route:list' => new RouteList(),
             'serve' => new Serve(),
         ];
