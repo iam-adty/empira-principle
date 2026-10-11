@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `637 tests, 1160 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `723 tests, 1316 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -27,13 +27,17 @@ php bin/empira make:component Counter            # generators write to src/compo
 php bin/empira route:list                        # routes an app registers
 ```
 
-**The test suite is the only gate** — `composer test` runs it. There is no CI:
-neither repository has a remote, and GitHub Actions only executes for a
-repository hosted on GitHub.
+**The test suite is the only gate** — `composer test` runs it, in Docker,
+against a real PostgreSQL. There is no CI: neither repository has a remote, and
+GitHub Actions only executes for a repository hosted on GitHub.
+
+`tools/test` starts the database if it is down and **refuses to run** if it
+cannot — a suite that quietly skipped the driver tests is a green tick that
+proves nothing.
 
 ## Where things live
 
-74 source files across 13 namespaces. The 16 files at `src/` root are the core; everything else is a subsystem.
+93 source files across 19 namespaces. The 16 files at `src/` root are the core; everything else is a subsystem.
 
 | Path | Responsibility |
 |---|---|
@@ -55,9 +59,10 @@ repository hosted on GitHub.
 | `src/View/` | `Layout`, `Region` — the page shell and its swappable areas |
 | `src/Container/` | Autowiring service container |
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
-| `src/Data/` | PDO wrapper + fluent query builder |
+| `src/Data/` | `Connection`, `Query`, `Db`, `Grammar` + dialects, `Migrator`, `ConnectionFactory` |
 | `src/Config/` | `.env` parsing, dot-notation config |
 | `src/Logging/` | `Logger`, `FileLogger`, `NullLogger`, `LogLevel` |
+| `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth` |
 | `src/Security/Csrf.php` | Session-backed CSRF for component actions |
 | `src/Testing/` | `TestClient`, `TestResponse` |
 | `src/Console/` | CLI kernel and commands |
@@ -89,6 +94,34 @@ Break one of these and a component becomes exploitable or silently broken.
 Last reviewed: 2026-10-11. These have each cost time in this codebase.
 
 ### Live hazards — will bite you
+
+**`self::` in a base class silently ignores subclass constants.** `AbstractGrammar`
+reads `static::OPEN` for its quote character; `self::OPEN` would bind to the base
+class, every dialect would emit backticks, and PostgreSQL would reject them at
+runtime. It looked correct in review and was caught only by running against a
+real server — a unit test asserting on strings would have passed.
+
+**A hand-written quote character is the bug the grammar exists to prevent.**
+The aggregate alias was written as ``AS `aggregate` `` straight into a format
+string. On SQLite and MySQL that is fine, which is why it survived; on
+PostgreSQL it is a syntax error. **When the framework emits SQL, every quoted
+identifier goes through the dialect.**
+
+**`usort()` returns `bool`, not the array.** It has happened here: a method did
+`$sorted = usort($rows, …)` and the sort silently did nothing, so every ordering
+test failed at once with no hint why.
+
+**`$_ENV['X'] ?? 'default' === 'value'` does not mean what it looks like.** `??`
+binds looser than `===`, so this is `$_ENV['X'] ?? ('default' === 'value')` —
+truthy whenever `X` is set at all. It ran a SQLite-only `PRAGMA` against
+PostgreSQL. **Parenthesise the left side**, and prefer asking the object which
+dialect it is over re-reading an environment variable.
+
+**A factory that falls back is worse than one that throws.** `ConnectionFactory`
+was handed a config section and read `db.*` from it, found nothing, and opened
+an in-memory database — a working application with no data in it. Defaults are
+fine for *values*; a default that swallows a **shape** mistake is a silent
+failure.
 
 **A plain string appended to an element is escaped.** This is the rule that catches everyone:
 
@@ -146,6 +179,8 @@ A change is done when:
 - [docs/components.md](docs/components.md) — props, actions, verbs
 - [docs/routing.md](docs/routing.md) — the routing API that exists today
 - [docs/views.md](docs/views.md) — layouts, regions, fragments
+- [docs/data.md](docs/data.md) — connections, dialects, queries, migrations
+- [docs/auth.md](docs/auth.md) — who is asking, and CSRF exemptions
 - [docs/testing.md](docs/testing.md) — fixtures, conventions, the client
 - [docs/recipes.md](docs/recipes.md) — copy-pasteable how-tos
 - [SPEC.md](SPEC.md) — planned work

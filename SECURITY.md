@@ -105,12 +105,15 @@ Never pass request input to `Raw`.
 
 ## What is deliberately not here
 
-- **No authentication.** Session + CSRF only. It is the first thing to design
-  properly when this reaches a multi-user application — see [SPEC.md](SPEC.md).
+- **No user storage, and no password policy.** `Auth` knows who is asking and
+  stops there. Where users live, how passwords are hashed, when they are
+  rotated and what a role means are application decisions with real
+  consequences — see [docs/auth.md](docs/auth.md#what-is-deliberately-not-here).
 - **No rate limiting, no CORS, no TLS configuration.** Those belong at the edge
   (reverse proxy, load balancer).
-- **No audit log.** `Logging` exists but is not wired to authentication, because
-  there is none.
+- **No audit log.** `Logging` exists but is not wired to authentication. A
+  successful and a failed sign-in are exactly the events worth recording, and
+  which of them to keep is a decision about retention, not a technical one.
 
 ## Reporting a vulnerability
 

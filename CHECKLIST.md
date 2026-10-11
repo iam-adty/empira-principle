@@ -122,8 +122,14 @@ header at all**, so a wildcard resolves to HTML. Verified against
 
 ## Deferred
 
-- [ ] Authentication — explicitly parked. It plugs into the negotiated format and the error envelope once those land.
-- [ ] CSRF exemption for token-authenticated routes
+- ~~Authentication~~ — shipped 2026-10-11. Guards, `UserProvider`, per-request
+  `Auth`, `RequireAuth`, bearer and session guards. See
+  [docs/auth.md](docs/auth.md).
+- ~~CSRF exemption for token-authenticated routes~~ — shipped 2026-10-11. A
+  valid bearer token is exempt because an `Authorization` header is not an
+  ambient credential, plus a per-route `#[Route(csrf: false)]`. A
+  session-authenticated POST with no token is still refused, and a test fails
+  if that ever changes.
 
 ---
 

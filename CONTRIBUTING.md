@@ -5,7 +5,9 @@
 
 Thanks for looking. This is a young framework, and the test suite is still the
 gate — there is no CI, so `composer test` before claiming something works. It
-runs the whole suite in Docker; see [Setup](#setup).
+runs the whole suite in Docker against a real PostgreSQL, so **Docker is
+required** — `composer test` starts the services and refuses to run if they
+cannot come up.
 
 ## Setup
 

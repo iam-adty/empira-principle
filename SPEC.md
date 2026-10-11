@@ -150,11 +150,25 @@ Fixed alongside this work, and worth having had it been independent: it is now m
 
 ---
 
-## 3. Authentication `[deferred]`
+## 3. Authentication `[shipped]`
 
-Explicitly out of scope for now. When it arrives it plugs into two seams this document already establishes: the negotiated response format, and the error envelope (`401` in the same shape).
+Shipped as three interfaces that stay apart on purpose: `Auth\Guard` (who is
+this request), `Auth\UserProvider` (which user is that id, is this password
+theirs) and `Auth\Auth` (the guards, asked once per request). The framework
+stores no users and hashes no passwords — `password_hash` is used where a hash
+is needed, and `DatabaseUserProvider` keeps it out of `User` so it cannot be
+logged by accident.
 
-No design work has been done. Deliberately.
+Two seams this document already established are what it plugs into, exactly as
+planned: `RequireAuth` throws rather than returning a response, so a 401 gets
+the negotiated format and the error envelope for free; and CSRF exemption is
+decided by the middleware that performs the check, because a route-scoped flag
+arrives after the refusal.
+
+`Auth` is bound per request rather than reset, so identity cannot survive into
+a request it does not belong to.
+
+See [docs/auth.md](docs/auth.md).
 
 ---
 

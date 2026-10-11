@@ -89,14 +89,12 @@ final class Migrate implements Command
         $env = $_ENV;
 
         return new \IamAdty\Empira\Config\Config([
-            'db' => [
-                'driver' => $env['DB_DRIVER'] ?? 'sqlite',
-                'database' => $env['DB_DATABASE'] ?? ':memory:',
-                'host' => $env['DB_HOST'] ?? '127.0.0.1',
-                'port' => $env['DB_PORT'] ?? 0,
-                'username' => $env['DB_USERNAME'] ?? '',
-                'password' => $env['DB_PASSWORD'] ?? '',
-            ],
+            'driver' => $env['DB_DRIVER'] ?? 'sqlite',
+            'database' => $env['DB_DATABASE'] ?? ':memory:',
+            'host' => $env['DB_HOST'] ?? '127.0.0.1',
+            'port' => $env['DB_PORT'] ?? 0,
+            'username' => $env['DB_USERNAME'] ?? '',
+            'password' => $env['DB_PASSWORD'] ?? '',
         ]);
     }
 }

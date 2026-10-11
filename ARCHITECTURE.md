@@ -142,6 +142,40 @@ status code, while everything else stays HTML. The rule that makes this safe is
 that **htmx sends no `Accept` header at all**, so a wildcard resolves to HTML —
 see [docs/json-errors.md](docs/json-errors.md).
 
+## Data sits below everything
+
+```
+Request → middleware → routing → handler
+                                 ↓
+                          Db / Query → Connection → PDO → driver
+```
+
+Nothing above `Db` knows what a database is. A handler asks for `Db` by type and
+the container supplies one, which is what lets a repository — or, later, an
+ORM's model — be an ordinary autowired class with no framework wiring of its own.
+
+The one thing that varies by database is quoted identifiers, and that lives in a
+`Grammar`. Everything else in `Query` is portable, and the validation of what
+counts as an identifier does not vary at all: identifiers cannot be bound by any
+driver, so they travel inside the SQL string, which makes them an injection
+vector. A dialect inherits the check rather than restating it.
+
+See [docs/data.md](docs/data.md).
+
+## Identity is resolved before anything asks
+
+`Auth` is bound per request, beside `Request`, `Format` and `RouteParams`, and
+consults its guards once. It is not a singleton because it does not need
+resetting — a fresh instance cannot remember the request before it.
+
+The distinction the framework is careful about is *who* versus *which
+credential*: a session-authenticated request and a bearer-authenticated request
+both have a user, and only the second is exempt from CSRF. One is protected by
+an ambient cookie the browser attaches by itself; the other is not, and a
+cross-site page cannot forge it.
+
+See [docs/auth.md](docs/auth.md).
+
 ## Testing strategy
 
 The suite drives the framework the way htmx does — render a page, extract the signed URLs its own markup advertises, post to one, assert on the returned fragment. That means a change that breaks wiring fails a test without anyone asserting on markup by hand.

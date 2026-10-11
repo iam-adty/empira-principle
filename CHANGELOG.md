@@ -15,6 +15,22 @@ can change without a major bump, though changes are always documented here.
 
 ### Added
 
+- **A database you can wire up.** `$app->database([...])` builds a connection
+  from configuration and makes `Db` autowirable, so a repository can take it in a
+  constructor. Before this, asking the container for a `Db` threw — its
+  constructor wants a `Connection`, which wants a `PDO`.
+- **Dialects.** `Data\Grammar` owns how an identifier is quoted: backticks for
+  SQLite and MySQL, double quotes for PostgreSQL. The validation of what counts
+  as an identifier lives in `AbstractGrammar` and is inherited, so a dialect
+  cannot ship with a looser check.
+- **Migrations.** `Data\Migrator` plus `empira migrate`, running versioned files
+  from `migrations/`. A migration is recorded only after it succeeds, so a
+  failure is retried rather than skipped past.
+- **Authentication.** `Auth\Guard`, `Auth\UserProvider` and `Auth\Auth`; session
+  and bearer guards; `RequireAuth` middleware; `DatabaseUserProvider`. No user
+  storage and no password policy — see docs/auth.md.
+- **Query builder for what an ORM needs:** aggregates (`count`, `sum`, `avg`,
+  `min`, `max`), `groupBy`, `having`, `leftJoin`, `rightJoin`, `exists`.
 - **`#[Route]` attribute routing.** A `Layout` or controller method can declare
   its own URL: `#[Route('/todos', name: 'todos.index')]`. Repeatable, and
   targeting both classes and methods, so one class can answer several URLs.
@@ -49,6 +65,11 @@ can change without a major bump, though changes are always documented here.
 
 ### Changed
 
+- **The suite runs in Docker against a real PostgreSQL.** `tools/test` starts
+  the database if it is down and refuses to run if it cannot — a suite that
+  quietly skipped the driver tests would be a green tick that proves nothing.
+  This removed the CI workflow, which never ran because neither repository has
+  a remote.
 - `Layout::styles()` now wraps a `Raw` stylesheet in a `<style>` element instead
   of appending it bare into `<head>`, where a browser would hoist it away and
   discard it. An `Element` return value is still used as-is.
@@ -64,6 +85,15 @@ can change without a major bump, though changes are always documented here.
 
 ### Fixed
 
+- **`self::OPEN` in `AbstractGrammar` bound to the base class**, so every
+  dialect emitted backticks and PostgreSQL would have rejected them. Only a live
+  server caught it; string assertions passed.
+- **The aggregate alias was written with a hand-typed backtick**, which is the
+  exact mistake the grammar exists to prevent — invisible on SQLite and MySQL,
+  a syntax error on PostgreSQL.
+- **`ConnectionFactory` read `db.*` from a config section that held the bare
+  keys**, found nothing, and quietly opened an in-memory database. Defaults that
+  swallow a shape mistake are silent failures.
 - **Discovered routes were never sorted.** `commitDiscovered()` assigned
   `usort()`'s return value — a `bool` — to the array it was meant to hold, so
   the specificity sort silently did nothing.

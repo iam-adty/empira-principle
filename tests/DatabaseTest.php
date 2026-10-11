@@ -101,19 +101,41 @@ final class DatabaseTest extends TestCase
         $this->assertInstanceOf(SqliteGrammar::class, $connection->grammar());
     }
 
+    public function testTheFactoryUsesTheFileItWasGivenRatherThanFallingBackToMemory(): void
+    {
+        // The factory reads a flat `database` key. Handed the nested form it
+        // would find nothing and quietly open an in-memory database instead —
+        // a typo that loses every row on the request after it.
+        $path = tempnam(sys_get_temp_dir(), 'empira-db-') ?: sys_get_temp_dir() . '/empira-fallback.sqlite';
+        unlink($path);
+
+        $connection = ConnectionFactory::make(new Config([
+            'driver' => 'sqlite',
+            'database' => $path,
+        ]));
+
+        $connection->execute('CREATE TABLE t (id INTEGER PRIMARY KEY)');
+        $connection->execute('INSERT INTO t (id) VALUES (1)');
+
+        $this->assertFileExists($path, 'the data went to the configured file');
+        $this->assertCount(1, $connection->fetchAll('SELECT * FROM t'));
+
+        unlink($path);
+    }
+
     public function testTheFactoryRefusesADriverItCannotBuild(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Unknown database driver "oracle"');
 
-        ConnectionFactory::make(new Config(['db' => ['driver' => 'oracle']]));
+        ConnectionFactory::make(new Config(['driver' => 'oracle']));
     }
 
     public function testSqliteTurnsOnForeignKeys(): void
     {
         // Off by default, and silently so: a cascade delete that quietly does
         // not happen is the kind of bug found in production.
-        $connection = ConnectionFactory::make(new Config(['db' => ['driver' => 'sqlite', 'database' => ':memory:']]));
+        $connection = ConnectionFactory::make(new Config(['driver' => 'sqlite', 'database' => ':memory:']));
 
         $this->assertSame('1', (string) $connection->fetchOne('PRAGMA foreign_keys')['foreign_keys']);
     }
@@ -155,9 +177,7 @@ final class DatabaseTest extends TestCase
     public function testTheDatabaseCanBeReadFromBoundConfiguration(): void
     {
         $app = new Application(self::SECRET, new NullState());
-        $app->container()->instance(Config::class, new Config([
-            'db' => ['driver' => 'sqlite', 'database' => ':memory:'],
-        ]));
+        $app->container()->instance(Config::class, new Config(['db' => ['driver' => 'sqlite', 'database' => ':memory:']]));
 
         $app->database();
 
