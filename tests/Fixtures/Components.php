@@ -502,3 +502,52 @@ final class ClockFixture extends \IamAdty\Empira\Component
             ->append($this->hx->button()->text('speak')->action('speak'));
     }
 }
+
+/**
+ * A component that brings its own stylesheet.
+ *
+ * The rule under test is *where* the `<style>` lands: inside the root element,
+ * which is the swap target, so it comes back when htmx swaps this component
+ * alone. A stylesheet in `<head>` would be gone by then.
+ */
+final class StyledFixture extends \IamAdty\Empira\Component
+{
+    #[\IamAdty\Empira\Attributes\Post]
+    public function restyle(): void
+    {
+        $this->with('count', $this->intProp('count') + 1);
+    }
+
+    protected function styles(): \IamAdty\Empira\Raw
+    {
+        return \IamAdty\Empira\Raw::of('.styled-fixture { display: grid }');
+    }
+
+    protected function render(): \IamAdty\Empira\Element
+    {
+        return $this->hx->div()
+            ->id($this->id())
+            ->class('styled-fixture')
+            ->append(
+                $this->hx->p()->text('styled ' . $this->intProp('count')),
+                $this->hx->button()->text('restyle')->action('restyle')
+            );
+    }
+}
+
+/**
+ * The same, but rendering a {@see \IamAdty\Empira\Raw} instead of an element,
+ * which has no root to prepend into.
+ */
+final class RawStyledFixture extends \IamAdty\Empira\Component
+{
+    protected function styles(): \IamAdty\Empira\Raw
+    {
+        return \IamAdty\Empira\Raw::of('.raw-styled-fixture { display: block }');
+    }
+
+    protected function render(): \IamAdty\Empira\Raw
+    {
+        return \IamAdty\Empira\Raw::of(sprintf('<p id="%s">raw</p>', $this->id()));
+    }
+}

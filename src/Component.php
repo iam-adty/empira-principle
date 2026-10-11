@@ -146,10 +146,68 @@ abstract class Component
                 $rendered->id($this->targetId);
             }
 
+            $style = $this->styleElement();
+
+            if ($style !== null) {
+                $rendered->prepend($style);
+            }
+
             return $rendered;
         }
 
-        return $rendered instanceof Raw ? $rendered : Raw::of($rendered);
+        // A component that renders raw markup rather than an element still gets
+        // its styling, prefixed as text — there is no element to prepend to.
+        $style = $this->styleElement();
+        $css = $style instanceof Raw ? $style->get() : ($style?->render() ?? '');
+
+        if ($rendered instanceof Raw) {
+            return $css === '' ? $rendered : Raw::of($css . $rendered->get());
+        }
+
+        return Raw::of($css . $rendered);
+    }
+
+    /**
+     * This component's own styling, emitted inside its root element.
+     *
+     * The alternative is one stylesheet in `<head>` shared by every component,
+     * which makes the sheet a list of everyone's private rules and means a
+     * component cannot be lifted out with its appearance intact.
+     *
+     * Inside the root element is the point. The root element is the swap
+     * target, so the `<style>` arrives again with every swap htmx performs —
+     * put it in `<head>` and a component re-fetched on its own would arrive
+     * unstyled. It is prepended rather than appended so it wins on order
+     * against a global sheet it is meant to override.
+     *
+     *     protected function styles(): Raw
+     *     {
+     *         return Raw::of('.counter { display: flex }');
+     *     }
+     */
+    protected function styles(): Raw
+    {
+        return Raw::of('');
+    }
+
+    /**
+     * The `<style>` element for {@see Component::styles()}, or null when the
+     * component has none.
+     *
+     * An {@see Element} return from `styles()` is taken as-is, so a component
+     * can emit its own tag the way a layout can.
+     */
+    private function styleElement(): Element|Raw|null
+    {
+        $styles = $this->styles();
+
+        if ($styles instanceof Element) {
+            return $styles;
+        }
+
+        $css = $styles->get();
+
+        return $css === '' ? null : $this->hx->style()->raw($css);
     }
 
     /**

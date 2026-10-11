@@ -13,6 +13,8 @@ use IamAdty\Empira\Tests\Fixtures\ActionOverrideFixture;
 use IamAdty\Empira\Tests\Fixtures\Clock;
 use IamAdty\Empira\Tests\Fixtures\ClockFixture;
 use IamAdty\Empira\Tests\Fixtures\MixedActionsFixture;
+use IamAdty\Empira\Tests\Fixtures\RawStyledFixture;
+use IamAdty\Empira\Tests\Fixtures\StyledFixture;
 use IamAdty\Empira\Tests\Fixtures\UnsafeAttributeFixture;
 use IamAdty\Empira\Tests\Fixtures\VerbsFixture;
 use PHPUnit\Framework\TestCase;
@@ -69,6 +71,55 @@ final class ActionTest extends TestCase
         preg_match_all('/hx-(get|post|put|patch|delete)="/', $html, $matches);
 
         return array_values(array_unique($matches[1] ?? []));
+    }
+
+    // ---------------------------------------------------------------- styles
+
+    public function testAComponentEmitsItsOwnStylesheet(): void
+    {
+        $app = $this->app();
+        $app->registry()->alias('styled', StyledFixture::class);
+
+        $html = (string) $app->render(StyledFixture::class)->render();
+
+        $this->assertStringContainsString('.styled-fixture { display: grid }', $html);
+    }
+
+    public function testTheStylesheetIsInsideTheSwapTargetSoItSurvivesASwap(): void
+    {
+        $app = $this->app();
+        $app->registry()->alias('styled', StyledFixture::class);
+
+        $html = (string) $app->render(StyledFixture::class)->render();
+        $url = $this->urlFor($html, 'post', 'restyle');
+
+        $response = $app->handle(new Request('POST', $url, headers: ['HX-Request' => 'true']));
+
+        // htmx replaces this component's innerHTML and nothing else. A sheet in
+        // <head> would be gone; inside the root element it arrives with the swap.
+        $this->assertStringContainsString('.styled-fixture { display: grid }', $response->body());
+        $this->assertStringContainsString('styled 1', $response->body());
+    }
+
+    public function testAComponentWithoutStylesEmitsNoStyleElement(): void
+    {
+        $app = $this->app();
+
+        $this->assertStringNotContainsString('<style', (string) $app->render(VerbsFixture::class)->render());
+    }
+
+    public function testAComponentRenderingRawStillEmitsItsStylesheet(): void
+    {
+        $app = $this->app();
+        $app->registry()->alias('rawstyled', RawStyledFixture::class);
+
+        // This fixture renders Raw, so the result is stringified directly —
+        // Raw has __toString but no render().
+        $html = (string) $app->render(RawStyledFixture::class);
+
+        // No element to prepend into, so the sheet is prefixed as text.
+        $this->assertStringContainsString('.raw-styled-fixture { display: block }', $html);
+        $this->assertStringContainsString('<p', $html);
     }
 
     // ---------------------------------------------------------------- injection
