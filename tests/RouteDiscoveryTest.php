@@ -35,14 +35,12 @@ final class RouteDiscoveryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/empira-discovery-' . bin2hex(random_bytes(4));
-        mkdir($this->directory, 0o777, true);
-        self::$fixturePaths = [];
+        $this->directory = Temp::dir('empira-discovery-');        self::$fixturePaths = [];
     }
 
     protected function tearDown(): void
     {
-        $this->deleteTree($this->directory);
+        Temp::remove($this->directory);
         self::$fixturePaths = [];
     }
 
@@ -108,24 +106,6 @@ final class RouteDiscoveryTest extends TestCase
         self::registerFixtureLoader();
     }
 
-    private function deleteTree(string $path): void
-    {
-        if (!is_dir($path)) {
-            return;
-        }
-
-        foreach (scandir($path) ?: [] as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            $child = $path . '/' . $entry;
-
-            is_dir($child) ? $this->deleteTree($child) : unlink($child);
-        }
-
-        rmdir($path);
-    }
 
     // ---------------------------------------------------------------- discovery
 

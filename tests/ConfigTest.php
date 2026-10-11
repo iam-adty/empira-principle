@@ -109,7 +109,7 @@ final class ConfigTest extends TestCase
 
     public function testFromEnvFileReadsAndParsesAFile(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-env');
+        $path = Temp::file('empira-env');
 
         $this->assertIsString($path);
         file_put_contents($path, "APP_ENV=local\nDB_HOST=localhost\n");

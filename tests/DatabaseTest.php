@@ -28,12 +28,8 @@ final class DatabaseTest extends TestCase
 
     protected function tearDown(): void
     {
-        if ($this->directory !== '' && is_dir($this->directory)) {
-            foreach (glob($this->directory . '/*') ?: [] as $file) {
-                unlink($file);
-            }
-
-            rmdir($this->directory);
+        if ($this->directory !== '') {
+            Temp::remove($this->directory);
         }
 
         $this->directory = '';
@@ -42,9 +38,7 @@ final class DatabaseTest extends TestCase
     private function migrationDirectory(): string
     {
         if ($this->directory === '') {
-            $this->directory = sys_get_temp_dir() . '/empira-migrations-' . bin2hex(random_bytes(6));
-
-            mkdir($this->directory, 0o777, true);
+            $this->directory = Temp::dir('empira-migrations-');
         }
 
         return $this->directory;
@@ -106,7 +100,9 @@ final class DatabaseTest extends TestCase
         // The factory reads a flat `database` key. Handed the nested form it
         // would find nothing and quietly open an in-memory database instead —
         // a typo that loses every row on the request after it.
-        $path = tempnam(sys_get_temp_dir(), 'empira-db-') ?: sys_get_temp_dir() . '/empira-fallback.sqlite';
+        // `Temp::file()` creates the file; SQLite wants a path that is not
+        // there yet, so it is removed again to prove the factory creates it.
+        $path = Temp::file('empira-db-');
         unlink($path);
 
         $connection = ConnectionFactory::make(new Config([
@@ -318,7 +314,16 @@ final class DatabaseTest extends TestCase
     {
         $logged = new Connection(Connection::sqlite(':memory:')->pdo(), true, $grammar);
 
-        (new Migrator($logged, sys_get_temp_dir()))->ran();
+        // Its own empty directory rather than `tmp/` itself: this passes one as
+        // a *migrations* directory, and pointing that at the shared folder would
+        // have it scan whatever else happened to be lying there.
+        $empty = Temp::dir('empira-ledger-');
+
+        try {
+            (new Migrator($logged, $empty))->ran();
+        } finally {
+            Temp::remove($empty);
+        }
 
         $queries = $logged->queries();
 

@@ -18,7 +18,7 @@ final class ConsoleTest extends TestCase
     protected function tearDown(): void
     {
         foreach ($this->temporary as $directory) {
-            self::remove($directory);
+            Temp::remove($directory);
         }
 
         $this->temporary = [];
@@ -470,9 +470,7 @@ final class ConsoleTest extends TestCase
      */
     private function tempdir(): string
     {
-        $directory = sys_get_temp_dir() . '/empira-console-' . bin2hex(random_bytes(6));
-
-        mkdir($directory, 0o777, true);
+        $directory = Temp::dir('empira-console-');
 
         $this->temporary[] = $directory;
 
@@ -490,24 +488,4 @@ final class ConsoleTest extends TestCase
         return $status;
     }
 
-    /**
-     * Delete a directory and everything under it.
-     */
-    private static function remove(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $entries = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($entries as $entry) {
-            $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
-        }
-
-        rmdir($directory);
-    }
 }

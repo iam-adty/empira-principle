@@ -15,7 +15,7 @@ final class LoggingTest extends TestCase
 {
     public function testItWritesOneLinePerEntry(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-log');
+        $path = Temp::file('empira-log');
 
         $this->assertIsString($path);
 
@@ -37,7 +37,7 @@ final class LoggingTest extends TestCase
 
     public function testItAppendsJsonEncodedContext(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-log');
+        $path = Temp::file('empira-log');
 
         $this->assertIsString($path);
 
@@ -57,7 +57,7 @@ final class LoggingTest extends TestCase
 
     public function testItLeavesTheContextOffWhenThereIsNone(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-log');
+        $path = Temp::file('empira-log');
 
         $this->assertIsString($path);
 
@@ -75,7 +75,7 @@ final class LoggingTest extends TestCase
 
     public function testItLeavesTheContextOffWhenDisabled(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-log');
+        $path = Temp::file('empira-log');
 
         $this->assertIsString($path);
 
@@ -92,7 +92,7 @@ final class LoggingTest extends TestCase
 
     public function testItSkipsMessagesBelowTheMinimumLevel(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-log');
+        $path = Temp::file('empira-log');
 
         $this->assertIsString($path);
 
@@ -117,7 +117,7 @@ final class LoggingTest extends TestCase
 
     public function testAMessageWithANewlineCannotForgeASecondEntry(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'empira-log');
+        $path = Temp::file('empira-log');
 
         $this->assertIsString($path);
 
@@ -138,7 +138,7 @@ final class LoggingTest extends TestCase
 
     public function testItCreatesMissingParentDirectories(): void
     {
-        $directory = sys_get_temp_dir() . '/empira-log-' . bin2hex(random_bytes(6));
+        $directory = Temp::dir('empira-log-');
         $path = $directory . '/nested/app.log';
 
         try {
@@ -149,14 +149,14 @@ final class LoggingTest extends TestCase
             $this->assertFileExists($path);
             $this->assertMatchesEntry('INFO', 'Created the directory', self::lines($path)[0]);
         } finally {
-            @unlink($path);
-            @rmdir($directory);
+            Temp::remove($path);
+            Temp::remove($directory);
         }
     }
 
     public function testAFailedWriteIsSwallowed(): void
     {
-        $blocker = tempnam(sys_get_temp_dir(), 'empira-log');
+        $blocker = Temp::file('empira-log');
 
         $this->assertIsString($blocker);
 
