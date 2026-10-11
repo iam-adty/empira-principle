@@ -1,6 +1,6 @@
 # Data
 
-> **Status: describes shipped code.** Verified against `723 tests, 1316
+> **Status: describes shipped code.** Verified against `731 tests, 1328
 > assertions`; the PostgreSQL tests run against a real server in Docker.
 
 Three layers, each of which knows only about the one below it:

@@ -105,6 +105,62 @@ discards, with a `200` and nothing in the console.
 > element around it. Wrapping decides where the text lands, not whether it is
 > safe — see [SECURITY.md](../SECURITY.md).
 
+This is the **global** layer: one sheet for the whole document. A component that
+owns its own appearance declares it on the component instead, where it is emitted
+inside its swap target — see [components.md](components.md#styling).
+
+## A master layout, and pages that extend it
+
+`regions()` is a plain method, so a layout can extend another and keep what it
+already declared:
+
+```php
+abstract class SiteLayout extends Layout
+{
+    protected function regions(): array
+    {
+        return [
+            'nav' => fn(Region $r) => $r->component(NavBar::class),
+            'main' => fn(Region $r) => null,   // left to the page
+        ];
+    }
+
+    protected function styles(): Element|Raw
+    {
+        return Raw::of(Css::base());
+    }
+}
+
+final class DashboardLayout extends SiteLayout
+{
+    protected function regions(): array
+    {
+        return [...parent::regions(), 'main' => fn(Region $r) => $r->component(UserCard::class)];
+    }
+}
+```
+
+`nav` and the global stylesheet are declared **once**. A page cannot forget the
+navigation or spell it differently, and cannot accidentally ship a page with no
+stylesheet.
+
+The two styling layers meet here: this one lands in `<head>`, a component's own
+lands inside its root element, so it arrives later in the document and wins on
+order. See [components.md](components.md#styling).
+
+### A page can declare its own gate
+
+```php
+#[Route('/dashboard', name: 'dashboard', methods: '*',
+    middleware: [RedirectGuests::class])]
+final class DashboardLayout extends SiteLayout { /* … */ }
+```
+
+`methods: '*'` so the gate does not depend on which verb arrived. But a gate on
+a route is **not sufficient for a form**: forms post to their own signed
+component URL under `/empira/…`, which no route middleware ever sees. An action
+that changes who you are has to check for itself.
+
 ## Regions
 
 `Region` is the swappable unit. It gives its element a stable id so generated

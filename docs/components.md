@@ -148,6 +148,40 @@ Actions that are refused, always:
 - inherited from `Component` itself, so a careless `actions()` cannot expose
   `toHtml()` or `with()`.
 
+### An action takes what it asks for
+
+Parameters are resolved by type, exactly as a controller's are:
+
+```php
+#[Post]
+public function login(Auth $auth, UserRepository $users): void
+{
+    $user = $users->byEmail($this->request()->string('email'));
+
+    if ($user === null || !$users->verify($user, $this->request()->string('password'))) {
+        $this->with('error', 'Those credentials did not match any account.');
+
+        return;
+    }
+
+    $auth->login($user);
+
+    $this->response()->redirect('/dashboard');
+}
+```
+
+Without this, a component could render a form and then have nowhere to go with
+it. An action that asks for nothing is unaffected, and one that asks for
+something unresolvable is refused loudly rather than called with a missing
+argument.
+
+Note that **the return value is discarded.** An action responds by mutating its
+props and the response — `with()` re-renders the swap, `response()->redirect()`
+sets `HX-Redirect` — and that is what the swap is built from.
+
+Autowiring does not widen what may be *invoked*: an undeclared action is refused
+before any of this happens. A mangled action URL is still a 403.
+
 ## Wiring elements
 
 Inside a component, `$this->hx` is an `ElementFactory` already wired to this
@@ -212,6 +246,31 @@ protected function renderComponent(string $class, array $props = []): Element|Ra
 
 Builds another component with the same context, so a page can be assembled from
 parts without the parent knowing their URLs.
+
+**A nested component still has to be registered.** `renderComponent()` builds it
+directly, but the token its action URL carries names the class and is resolved
+through the {@see \IamAdty\Empira\Registry} when the action fires. An
+unregistered nested component renders perfectly and then answers 404 the moment
+its button is pressed — which is a confusing way to find out.
+
+## Styling
+
+```php
+protected function styles(): Raw
+{
+    return Raw::of('.login-form .field { margin-bottom: .9rem }');
+}
+```
+
+Emitted as a `<style>` **inside the component's root element**, which is the swap
+target. htmx replaces that element's `innerHTML` and nothing else, so a sheet in
+`<head>` would be gone by the time the component is re-fetched on its own. Inside
+the root it arrives with every swap, and it is prepended rather than appended so
+it wins on order against the global sheet it is meant to override.
+
+A structural component with no appearance of its own should return an empty
+`Raw` — a form composes `FormField`s and owns their styling, and a `<style>` on
+each field would repeat once per field per form.
 
 ## Further reading
 

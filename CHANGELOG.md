@@ -15,6 +15,11 @@ can change without a major bump, though changes are always documented here.
 
 ### Added
 
+- **A component may carry its own stylesheet.** `Component::styles()` is emitted
+  inside the component's root element — which is the swap target — so the CSS
+  arrives again with every htmx swap. A sheet in `<head>` would be gone the
+  moment a component was re-fetched on its own. Prepending rather than appending
+  lets it override the global sheet on order.
 - **A database you can wire up.** `$app->database([...])` builds a connection
   from configuration and makes `Db` autowirable, so a repository can take it in a
   constructor. Before this, asking the container for a `Db` threw — its
@@ -65,6 +70,14 @@ can change without a major bump, though changes are always documented here.
 
 ### Changed
 
+- **Component actions are autowired.** They were called with no arguments at
+  all, which made a component unable to do anything needing a service — a login
+  form could render itself and then had nowhere to go. `Router::dispatch()` now
+  resolves an action's parameters by type, and `Component::container()` is
+  protected so `render()` can read a service too.
+
+  This does not widen what may be *invoked*: `guardAction()` still refuses an
+  undeclared action first, and a mangled action URL is still a 403.
 - **The suite runs in Docker against a real PostgreSQL.** `tools/test` starts
   the database if it is down and refuses to run if it cannot — a suite that
   quietly skipped the driver tests would be a green tick that proves nothing.
