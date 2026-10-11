@@ -145,6 +145,99 @@ final class DataTest extends TestCase
         (new Query())->get('users')->offset(-1);
     }
 
+    public function testItBuildsAGroupBy(): void
+    {
+        $query = (new Query())->get('users')->groupBy('team_id', 'role');
+
+        $this->assertSame('SELECT * FROM `users` GROUP BY `team_id`, `role`', $query->toSql());
+    }
+
+    public function testItBuildsAnAggregate(): void
+    {
+        $query = (new Query())->get('users')->count();
+
+        $this->assertSame('SELECT COUNT(*) AS `aggregate` FROM `users`', $query->toSql());
+    }
+
+    public function testAnAggregateSitsAlongsideTheColumnsItIsGroupedBy(): void
+    {
+        $query = (new Query())->get('users')->select('team_id')->count()->groupBy('team_id');
+
+        $this->assertSame(
+            'SELECT `team_id`, COUNT(*) AS `aggregate` FROM `users` GROUP BY `team_id`',
+            $query->toSql()
+        );
+    }
+
+    public function testItBuildsEveryAggregate(): void
+    {
+        foreach (['sum', 'avg', 'min', 'max'] as $function) {
+            $query = (new Query())->get('users')->{$function}('age');
+
+            $this->assertSame(
+                sprintf('SELECT %s(`age`) AS `aggregate` FROM `users`', strtoupper($function)),
+                $query->toSql()
+            );
+        }
+    }
+
+    public function testItRefusesAnUnknownAggregate(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown aggregate');
+
+        (new Query())->get('users')->having('MEDIAN', 'age', 30);
+    }
+
+    public function testItBuildsAHavingAndBindsItsValue(): void
+    {
+        $query = (new Query())->get('users')->sum('age')->groupBy('team')->having('SUM', 'age', 30, '>=');
+
+        $this->assertSame(
+            'SELECT SUM(`age`) AS `aggregate` FROM `users` GROUP BY `team` HAVING SUM(`age`) >= ?',
+            $query->toSql()
+        );
+        $this->assertSame([30], $query->bindings());
+    }
+
+    public function testHavingBindsAfterWhereBinds(): void
+    {
+        // The order of these two lists has to match the order of the
+        // placeholders in the SQL, or a condition silently reads the wrong
+        // column's value.
+        $query = (new Query())
+            ->get('users')
+            ->where('active', true)
+            ->sum('age')
+            ->having('SUM', 'age', 30);
+
+        $this->assertSame([true, 30], $query->bindings());
+    }
+
+    public function testItBuildsLeftAndRightJoins(): void
+    {
+        $this->assertSame(
+            'SELECT * FROM `users` LEFT JOIN `teams` ON `users`.`team_id` = `teams`.`id`',
+            (new Query())->get('users')->leftJoin('teams', 'users.team_id', '=', 'teams.id')->toSql()
+        );
+
+        $this->assertSame(
+            'SELECT * FROM `users` RIGHT JOIN `teams` ON `users`.`team_id` = `teams`.`id`',
+            (new Query())->get('users')->rightJoin('teams', 'users.team_id', '=', 'teams.id')->toSql()
+        );
+    }
+
+    public function testAnAggregateQuotesItsAliasThroughTheGrammar(): void
+    {
+        // Written by hand this is the bug PostgreSQL rejects: backticks are a
+        // syntax error there, so the alias has to travel through the dialect.
+        $query = (new Query(null, new \IamAdty\Empira\Data\Grammars\PostgresGrammar()))
+            ->get('users')
+            ->count();
+
+        $this->assertSame('SELECT COUNT(*) AS "aggregate" FROM "users"', $query->toSql());
+    }
+
     public function testItBuildsAJoin(): void
     {
         $query = (new Query())->get('users')->join('teams', 'users.team_id', '=', 'teams.id');

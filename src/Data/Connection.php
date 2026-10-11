@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace IamAdty\Empira\Data;
 
+use IamAdty\Empira\Data\Grammars\MySqlGrammar;
+use IamAdty\Empira\Data\Grammars\PostgresGrammar;
+use IamAdty\Empira\Data\Grammars\SqliteGrammar;
 use PDO;
 
 /**
@@ -20,22 +23,57 @@ use PDO;
  *     $connection->execute('INSERT INTO users (name) VALUES (?)', ['Ada']);
  *     $connection->fetchAll('SELECT * FROM users');   // [['id' => 1, 'name' => 'Ada']]
  *
+ * The connection also knows which {@see Grammar} it speaks, because the
+ * dialect decides how identifiers are quoted and PDO will not tell a query
+ * builder that on its own. Left unset, it is taken from the driver.
+ *
  * When you build the PDO yourself, set
  * `PDO::ATTR_EMULATE_PREPARES => false` on MySQL so parameter binding happens
  * in the server rather than in the client.
  */
 final class Connection
 {
+    private readonly Grammar $grammar;
+
     /** @var list<array{sql: string, bindings: array<int, mixed>, ms: float}> */
     private array $log = [];
 
     public function __construct(
         private readonly PDO $pdo,
         private readonly bool $logQueries = false,
+        ?Grammar $grammar = null,
     ) {
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $this->pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, false);
+
+        $this->grammar = $grammar ?? self::grammarFor(
+            (string) $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME)
+        );
+    }
+
+    /**
+     * The dialect this connection speaks.
+     */
+    public function grammar(): Grammar
+    {
+        return $this->grammar;
+    }
+
+    /**
+     * The grammar for a PDO driver name, defaulting to SQLite.
+     *
+     * The fallback matters more than it looks: {@see Query} builds SQL without
+     * a connection, so an unknown driver has to resolve to something rather
+     * than throw while someone is still deciding which database to use.
+     */
+    public static function grammarFor(string $driver): Grammar
+    {
+        return match (strtolower($driver)) {
+            'mysql', 'mariadb' => new MySqlGrammar(),
+            'pgsql', 'postgres', 'postgresql' => new PostgresGrammar(),
+            default => new SqliteGrammar(),
+        };
     }
 
     /**

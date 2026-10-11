@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace IamAdty\Empira\Data;
 
+use IamAdty\Empira\Data\Grammars\SqliteGrammar;
+
 /**
  * A fluent query builder that is useful even without a database.
  *
@@ -32,26 +34,23 @@ namespace IamAdty\Empira\Data;
  * Values are never interpolated. Every one of them becomes a `?` placeholder
  * and travels in `bindings()`, including `LIMIT` and `OFFSET`.
  *
- * Identifiers cannot be bound by any driver, so they are checked against
- * {@see Query::IDENTIFIER} and quoted with backticks, each dot-separated
- * segment quoted on its own so `users.name` becomes `` `users`.`name` ``. A
- * column name that arrives from a form, a query string or a config file is a
- * first-class injection vector, so anything that is not plainly an identifier
- * raises an {@see \InvalidArgumentException} rather than being escaped into
- * something that merely looks safe. Backticks are the MySQL and SQLite dialect;
- * a PostgreSQL connection wants the same builder with double quotes.
+ * Identifiers cannot be bound by any driver, so they are checked and quoted
+ * by the builder's {@see Grammar} — each dot-separated segment quoted on its
+ * own, so `users.name` becomes `` `users`.`name` `` in SQLite and MySQL and
+ * `"users"."name"` in PostgreSQL. A column name that arrives from a form, a
+ * query string or a config file is a first-class injection vector, so anything
+ * that is not plainly an identifier raises an {@see \InvalidArgumentException}
+ * rather than being escaped into something that merely looks safe.
  *
  * A query is single-use: build one chain and hand it to one terminal method.
  */
 final class Query
 {
-    /**
-     * The shape an identifier must have to be considered an identifier.
-     *
-     * Letters, digits and underscores, optionally qualified with dots. No
-     * spaces, no semicolons, no quotes, no comment markers, no leading digit.
-     */
-    public const IDENTIFIER = '/^[A-Za-z_][A-Za-z0-9_.]*$/';
+    /** The column an aggregate result is reported under. */
+    private const AGGREGATE_ALIAS = 'aggregate';
+
+    /** @var list<string> closed, so a function name is never interpolated freely */
+    private const AGGREGATES = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX'];
 
     /** @var list<string> */
     private const OPERATORS = ['=', '!=', '<>', '>', '<', '>=', '<=', 'like', 'not like'];
@@ -75,6 +74,15 @@ final class Query
     /** @var list<string> pre-rendered `column direction` pairs */
     private array $orders = [];
 
+    /** @var list<string> quoted column names */
+    private array $groups = [];
+
+    /** @var list<array{sql: string, bindings: list<mixed>}> */
+    private array $havings = [];
+
+    /** @var list<string> quoted aggregate expressions, e.g. `COUNT(*) AS aggregate` */
+    private array $aggregates = [];
+
     private ?int $limit = null;
 
     private ?int $offset = null;
@@ -82,24 +90,46 @@ final class Query
     /** @var array<string, mixed> quoted column name => value */
     private array $writes = [];
 
+    private readonly Grammar $grammar;
+
     /**
      * A builder with no connection builds SQL and nothing else.
+     *
+     * Without an explicit grammar it takes the connection's dialect, and with
+     * neither it behaves as SQLite — so an unconnected builder still produces
+     * the same backticked SQL it always did, which is what keeps the SQL-only
+     * tests meaningful.
      */
-    public function __construct(private readonly ?Connection $connection = null)
-    {
+    public function __construct(
+        private readonly ?Connection $connection = null,
+        ?Grammar $grammar = null,
+    ) {
+        $this->grammar = $grammar ?? $connection?->grammar() ?? new SqliteGrammar();
     }
 
     /**
-     * Shorthand for the common case: `from($table)->select('*')`.
+     * The dialect this builder writes SQL in.
+     */
+    public function grammar(): Grammar
+    {
+        return $this->grammar;
+    }
+
+    /**
+     * Shorthand for the common case: `from($table)`.
+     *
+     * It does not select `*` explicitly, because that would sit in the
+     * projection alongside an aggregate and turn `count()` into
+     * `SELECT *, COUNT(*)`. An empty projection already means "everything".
      */
     public function get(string $table): self
     {
-        return $this->from($table)->select('*');
+        return $this->from($table);
     }
 
     public function from(string $table): self
     {
-        $this->table = self::quote($table);
+        $this->table = $this->quote($table);
 
         return $this;
     }
@@ -109,7 +139,7 @@ final class Query
      */
     public function select(string ...$columns): self
     {
-        $this->columns = array_map(self::quote(...), $columns);
+        $this->columns = array_map($this->quote(...), $columns);
 
         return $this;
     }
@@ -122,12 +152,32 @@ final class Query
      */
     public function join(string $table, string $first, string $operator, string $second): self
     {
+        return $this->joinAs('INNER', $table, $first, $operator, $second);
+    }
+
+    /**
+     * A left join: keep every row on the left, with nulls where the right side
+     * has nothing. The common way to answer "which of these have no children?".
+     */
+    public function leftJoin(string $table, string $first, string $operator, string $second): self
+    {
+        return $this->joinAs('LEFT', $table, $first, $operator, $second);
+    }
+
+    public function rightJoin(string $table, string $first, string $operator, string $second): self
+    {
+        return $this->joinAs('RIGHT', $table, $first, $operator, $second);
+    }
+
+    private function joinAs(string $type, string $table, string $first, string $operator, string $second): self
+    {
         $this->joins[] = sprintf(
-            'INNER JOIN %s ON %s %s %s',
-            self::quote($table),
-            self::quote($first),
+            '%s JOIN %s ON %s %s %s',
+            $type,
+            $this->quote($table),
+            $this->quote($first),
             self::operator($operator),
-            self::quote($second),
+            $this->quote($second),
         );
 
         return $this;
@@ -146,7 +196,7 @@ final class Query
         }
 
         $this->wheres[] = [
-            'sql' => sprintf('%s %s ?', self::quote($column), self::operator($operator)),
+            'sql' => sprintf('%s %s ?', $this->quote($column), self::operator($operator)),
             'bindings' => [$value],
         ];
 
@@ -165,7 +215,7 @@ final class Query
         }
 
         $this->wheres[] = [
-            'sql' => sprintf('%s IN (%s)', self::quote($column), implode(', ', array_fill(0, count($values), '?'))),
+            'sql' => sprintf('%s IN (%s)', $this->quote($column), implode(', ', array_fill(0, count($values), '?'))),
             'bindings' => $values,
         ];
 
@@ -174,9 +224,81 @@ final class Query
 
     public function whereNull(string $column): self
     {
-        $this->wheres[] = ['sql' => self::quote($column) . ' IS NULL', 'bindings' => []];
+        $this->wheres[] = ['sql' => $this->quote($column) . ' IS NULL', 'bindings' => []];
 
         return $this;
+    }
+
+    /**
+     * Collapse rows into groups of this column.
+     *
+     * Almost always paired with an aggregate — a `GROUP BY` with nothing to
+     * aggregate produces one arbitrary row per group, which is a confusing way
+     * to say "I did not mean to do this".
+     */
+    public function groupBy(string ...$columns): self
+    {
+        foreach ($columns as $column) {
+            $this->groups[] = $this->quote($column);
+        }
+
+        return $this;
+    }
+
+    /**
+     * A condition on an aggregate, for narrowing the groups a `groupBy` made.
+     *
+     *     ->sum('price')->groupBy('team_id')->having('SUM', 'price', 30, '>=')
+     *     // … HAVING SUM(`price`) >= ?
+     *
+     * It takes the function and the column rather than a name, because a
+     * HAVING clause refers to the aggregate expression, not to the alias it
+     * was selected under — SQL will not resolve `HAVING `aggregate``, and will
+     * not resolve a bare `sum` either, because there is no column by that name.
+     */
+    public function having(string $function, string $column, mixed $value, string $operator = '='): self
+    {
+        $this->havings[] = [
+            'sql' => sprintf('%s %s ?', $this->aggregateExpression($function, $column), self::operator($operator)),
+            'bindings' => [$value],
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Select one aggregate over the whole result, aliased `aggregate`.
+     *
+     *     (new Query($db))->get('users')->count()->fetchOne();
+     *     // ['aggregate' => 42]
+     *
+     * The alias exists so the result is the same shape whatever was aggregated,
+     * which is what lets a caller read one key instead of guessing between
+     * `count` and `total`.
+     */
+    public function count(string $column = '*'): self
+    {
+        return $this->aggregate('COUNT', $column);
+    }
+
+    public function sum(string $column): self
+    {
+        return $this->aggregate('SUM', $column);
+    }
+
+    public function avg(string $column): self
+    {
+        return $this->aggregate('AVG', $column);
+    }
+
+    public function min(string $column): self
+    {
+        return $this->aggregate('MIN', $column);
+    }
+
+    public function max(string $column): self
+    {
+        return $this->aggregate('MAX', $column);
     }
 
     public function orderBy(string $column, string $direction = 'asc'): self
@@ -187,7 +309,7 @@ final class Query
             throw new \InvalidArgumentException(sprintf('Unknown sort direction: %s', $direction));
         }
 
-        $this->orders[] = self::quote($column) . ' ' . $direction;
+        $this->orders[] = $this->quote($column) . ' ' . $direction;
 
         return $this;
     }
@@ -293,6 +415,15 @@ final class Query
             }
         }
 
+        // HAVING placeholders come after the WHERE ones in the SQL and after
+        // them in this list, which is the only ordering that matters. Leaving
+        // them out would silently bind a condition's value to the wrong clause.
+        foreach ($this->havings as $having) {
+            foreach ($having['bindings'] as $binding) {
+                $bindings[] = $binding;
+            }
+        }
+
         if ($this->type === 'update') {
             return [...array_values($this->writes), ...$bindings];
         }
@@ -320,6 +451,18 @@ final class Query
      *
      * @return array<string, mixed>|null
      */
+    /**
+     * Is there at least one matching row?
+     *
+     * `SELECT *` is enough to answer it and costs the same as `COUNT(*)` on
+     * every database worth using, so the row is fetched and discarded rather
+     * than counted.
+     */
+    public function exists(): bool
+    {
+        return $this->first() !== null;
+    }
+
     public function first(): ?array
     {
         return $this->connection()->fetchOne($this->toSql(), $this->bindings());
@@ -342,9 +485,56 @@ final class Query
         return $this->connection;
     }
 
+    /**
+     * Record `FUNCTION(column) AS aggregate`.
+     *
+     * The function name is from a closed list rather than interpolated from the
+     * caller, and the column goes through the same identifier check as any
+     * other — aggregates are SQL too, and `count('id) FROM users; DROP ...')`
+     * would otherwise be a way past every other guard in this class.
+     *
+     * @param 'COUNT'|'SUM'|'AVG'|'MIN'|'MAX' $function
+     */
+    private function aggregate(string $function, string $column): self
+    {
+        // The alias goes through the grammar like every other identifier —
+        // writing the quote character by hand here is precisely the bug the
+        // grammar exists to prevent, and PostgreSQL rejects it as a syntax
+        // error at runtime.
+        $this->aggregates[] = sprintf(
+            '%s AS %s',
+            $this->aggregateExpression($function, $column),
+            $this->quote(self::AGGREGATE_ALIAS)
+        );
+
+        return $this;
+    }
+
+    /**
+     * `SUM(`price`)`, from a closed function list and a checked column.
+     *
+     * Aggregates are SQL too, and a caller-supplied function name would walk
+     * straight past every other guard in this class.
+     */
+    private function aggregateExpression(string $function, string $column): string
+    {
+        $function = strtoupper($function);
+
+        if (!in_array($function, self::AGGREGATES, true)) {
+            throw new \InvalidArgumentException(sprintf('Unknown aggregate: %s', $function));
+        }
+
+        return sprintf('%s(%s)', $function, $column === '*' ? '*' : $this->quote($column));
+    }
+
     private function selectSql(): string
     {
-        $sql = 'SELECT ' . ($this->columns === [] ? '*' : implode(', ', $this->columns));
+        // An aggregate sits alongside whatever columns were named, and stands
+        // alone when none were — `count()` with no columns is "how many rows",
+        // not "one arbitrary row".
+        $projection = [...$this->columns, ...$this->aggregates];
+
+        $sql = 'SELECT ' . ($projection === [] ? '*' : implode(', ', $projection));
 
         $sql .= ' FROM ' . $this->table();
 
@@ -353,6 +543,14 @@ final class Query
         }
 
         $sql .= $this->whereSql();
+
+        if ($this->groups !== []) {
+            $sql .= ' GROUP BY ' . implode(', ', $this->groups);
+        }
+
+        if ($this->havings !== []) {
+            $sql .= ' HAVING ' . implode(' AND ', array_column($this->havings, 'sql'));
+        }
 
         if ($this->orders !== []) {
             $sql .= ' ORDER BY ' . implode(', ', $this->orders);
@@ -399,12 +597,12 @@ final class Query
      *
      * @return array<string, mixed>
      */
-    private static function quoteKeys(array $values): array
+    private function quoteKeys(array $values): array
     {
         $quoted = [];
 
         foreach ($values as $column => $value) {
-            $quoted[self::quote((string) $column)] = $value;
+            $quoted[$this->quote((string) $column)] = $value;
         }
 
         return $quoted;
@@ -429,36 +627,14 @@ final class Query
     }
 
     /**
-     * Check an identifier and quote it segment by segment.
+     * Quote an identifier in this builder's dialect.
      *
-     * `*` and `table.*` pass through as-is; everything else has to look like an
-     * identifier before a backtick is put anywhere near it.
+     * The rules live in {@see Grammar}, not here, because what counts as an
+     * identifier must not vary between drivers — and what quotes it must.
      */
-    private static function quote(string $identifier): string
+    private function quote(string $identifier): string
     {
-        if ($identifier === '*') {
-            return '*';
-        }
-
-        if (str_ends_with($identifier, '.*')) {
-            return self::quote(substr($identifier, 0, -2)) . '.*';
-        }
-
-        if (preg_match(self::IDENTIFIER, $identifier) !== 1) {
-            throw new \InvalidArgumentException(sprintf('Unsafe SQL identifier: %s', $identifier));
-        }
-
-        $quoted = [];
-
-        foreach (explode('.', $identifier) as $segment) {
-            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $segment) !== 1) {
-                throw new \InvalidArgumentException(sprintf('Unsafe SQL identifier: %s', $identifier));
-            }
-
-            $quoted[] = '`' . $segment . '`';
-        }
-
-        return implode('.', $quoted);
+        return $this->grammar->quoteIdentifier($identifier);
     }
 
     /**
