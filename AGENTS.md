@@ -84,25 +84,39 @@ Break one of these and a component becomes exploitable or silently broken.
 
 ## Known Traps
 
-Every one of these has already cost time in this codebase.
+Last reviewed: 2026-10-11. These have each cost time in this codebase.
 
-**`markup()` must return `Element|Raw`, never a bare string.** A string handed to `append()` is *escaped*, which turns a component's markup into visible angle brackets in the middle of the page. `Component::markup()` is typed `Element|Raw` to make this a type error rather than a surprise.
+### Live hazards — will bite you
 
-**A test can pass while asserting nothing.** `ExampleTest` once asserted `assertStringContainsString('htmx', $body)` — which matched `class="htmx-indicator"` in the layout and would have passed whatever the search returned. **Assert on something that can only appear if the behaviour worked**: a specific `<li>`, an exact attribute, a status code. When you write an assertion, ask what the *opposite* outcome would produce.
+**A plain string appended to an element is escaped.** This is the rule that catches everyone:
+
+```php
+$this->hx->div()->append('<b>hi</b>')->render();          // <div>&lt;b&gt;hi&lt;/b&gt;/div>
+$this->hx->div()->append(Raw::of('<b>hi</b>'))->render(); // <div><b>hi</b></div>
+```
+
+Note what this is *not*: `render()` is declared `Element|Raw|string`, and `Component::markup()` wraps a returned string in `Raw` for you — so returning a plain string from `render()` is supported and is **not** a type error. The escaping happens at `Element::append()`. Wrap markup in `Raw::of()` when you mean it literally.
+
+**A test can pass while asserting nothing.** `AppTest` once asserted `assertStringContainsString('htmx', $body)` — which matched `class="htmx-indicator"` in the layout and would have passed whatever the search returned. **Assert on something that can only appear if the behaviour worked**: a specific `<li>`, an exact attribute, a status code. When you write an assertion, ask what the *opposite* outcome would produce.
 
 **A hook with no test is a bug waiting.** `Layout::styles()` appended its return value straight into `<head>`, so returning raw CSS emitted naked text that browsers hoist away and discard — the app rendered unstyled with a 200, and nothing caught it. `View/` had no test file at all. **Add the test with the feature.**
 
-**Route matching is first-match-wins.** `/todos/new` must be registered before `/todos/{id}` or the dynamic route swallows it. There is no specificity sort yet (see `SPEC.md`).
+**Route matching is first-match-wins.** `RouteCollection` iterates in declaration order, so `/todos/new` must be registered before `/todos/{id}` or the dynamic route swallows it. There is no specificity sort yet (see [SPEC.md](SPEC.md)).
 
-**Namespace renames must be idempotent.** Use a negative lookbehind (`(?<!IamAdty\\)Empira\\`) or a second pass double-prefixes everything.
+**`Container::singleton()` takes a class-string or factory, never an object.** The signature is `callable|string|null`. Pre-built objects go through `instance()`; passing one is a `TypeError`.
 
-**`Response::html()` discarded a second argument.** PHP silently drops extra args to a function that does not declare them. `Response::html('x', 406)` returned a 200 until the parameter was added.
+### Fixed — do not reintroduce
 
-**`Container::singleton()` takes a class-string or factory, never an object.** Pre-built objects go through `instance()`.
+**`Response::html()` used to discard a second argument.** PHP silently drops extra arguments to a function that does not declare them, so `Response::html('x', 406)` returned a 200. Fixed in `456b960` — it now takes `$status`. Still worth knowing when a status quietly goes missing.
 
-**`ReflectionMethod::invokeArgs()` needs its target object; `ReflectionFunction` must not get one.** They have different signatures.
+**The `Empira\` → `IamAdty\Empira\` rename was a one-time migration.** 336 occurrences, done. The technique generalises — a negative lookbehind (`(?<!IamAdty\\)Empira\\`) makes a search-and-replace idempotent, where a second pass would double-prefix everything — but it is not a live hazard here.
 
-**Composer path repositories need at least one commit.** With no git history there is no branch to infer a version from, and resolution fails. `APP_SECRET` must be ≥16 bytes (`TokenCodec` refuses less) and must not change between deploys.
+### Not repository-specific
+
+General PHP and Composer facts that bit us once. They are not conventions of this codebase:
+
+- `ReflectionMethod::invokeArgs()` takes a target object; `ReflectionFunction::invokeArgs()` must not get one. Different signatures, same method name.
+- A Composer **path repository** needs at least one commit in the target repository — with no git history there is no branch to infer a version from, and resolution fails. Relevant when setting up the sibling `app/` package, which links `../principle`.
 
 ## Definition of done
 
