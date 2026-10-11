@@ -256,6 +256,44 @@ final class ConsoleTest extends TestCase
         $this->assertStringContainsString('did not return an Application', $result['output']);
     }
 
+    public function testRouteListBootsAnApplicationInsteadOfRequiringARouteFile(): void
+    {
+        $target = $this->tempdir();
+
+        mkdir($target . '/src', 0o777, true);
+
+        file_put_contents($target . '/src/App.php', <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            namespace Demo;
+
+            use IamAdty\Empira\Application;
+            use IamAdty\Empira\Routing\RouteCollection;
+            use IamAdty\Empira\State\NullState;
+
+            final class App
+            {
+                public static function boot(): Application
+                {
+                    $app = new Application('a-secret-long-enough-for-this-test', new NullState());
+
+                    $routes = $app->routes();
+                    $routes->get('/health', static fn(): string => 'ok', 'health');
+
+                    return $app;
+                }
+            }
+            PHP);
+
+        $result = $this->console(['empira', 'route:list', '--target=' . $target]);
+
+        $this->assertSame(0, $result['code']);
+        $this->assertStringContainsString('/health', $result['output']);
+        $this->assertStringContainsString('health', $result['output']);
+    }
+
     public function testRouteListWarnsWhenNothingIsRegistered(): void
     {
         $target = $this->tempdir();

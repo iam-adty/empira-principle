@@ -14,6 +14,9 @@ use IamAdty\Empira\Http\Response;
 use IamAdty\Empira\Http\Session;
 use IamAdty\Empira\Routing\HttpException;
 use IamAdty\Empira\Routing\RouteCollection;
+use IamAdty\Empira\Routing\RouteParams;
+use IamAdty\Empira\Routing\RouteRegistrar;
+use IamAdty\Empira\Routing\RouteRegistry;
 use IamAdty\Empira\Routing\UrlGenerator;
 use IamAdty\Empira\Security\Csrf;
 use IamAdty\Empira\State\NullState;
@@ -69,6 +72,9 @@ final class Application
 
     /** The format negotiated for the request in flight. */
     private ?Format $format = null;
+
+    /** The parameters the current route matched. */
+    private ?RouteParams $params = null;
 
     public function __construct(
         string $secret,
@@ -212,10 +218,16 @@ final class Application
             ? Format::Json
             : Format::Html;
 
+        // Reset per request: an Application instance outlives the request in tests and
+        // in long-running workers, and `/todos/7` must not leave its `id` behind
+        // for the next request that matches nothing.
+        $this->params = new RouteParams();
+
         $this->container->instance(Request::class, $request);
         $this->container->instance(Response::class, $context->response);
         $this->container->instance(Context::class, $context);
         $this->container->instance(Format::class, $this->format);
+        $this->container->instance(RouteParams::class, $this->params);
 
         try {
             return $this->pipeline->send(
@@ -284,6 +296,10 @@ final class Application
         $match = $this->routes->match($request->method, $request->path());
 
         if ($match !== null) {
+            // Available to the handler by type, and merged into view() below.
+            $this->params = new RouteParams($match->parameters);
+            $this->container->instance(RouteParams::class, $this->params);
+
             $handler = fn(Request $request): Response => $this->toResponse(
                 $this->container->call($this->resolveHandler($match->handler()), $match->parameters),
                 $context->response
@@ -314,11 +330,16 @@ final class Application
      * Turn a declared handler into something callable.
      *
      * A controller may be written as `[TodoController::class, 'show']` or, when
-     * it is invokable, as the bare class name; either way the container builds
-     * it so its own dependencies are autowired.
+     * it is invokable, as the bare class name. A **Layout** is neither: naming
+     * one directly is the "this URL renders this page" case, so it is rendered
+     * here rather than called.
      */
     private function resolveHandler(mixed $handler): callable
     {
+        if (is_string($handler) && is_subclass_of($handler, View\Layout::class)) {
+            return fn(): Response => $this->view($handler);
+        }
+
         if (is_string($handler) && class_exists($handler)) {
             return $this->container->get($handler);
         }
@@ -358,6 +379,11 @@ final class Application
      * named. That is what lets a route serve both without the handler knowing
      * which one it is answering.
      *
+     * Parameters the current route matched are merged **beneath** `$data`, so an
+     * explicit value always wins. If the layout defines `mount()`, it is called
+     * with them — by name, with class-typed arguments autowired — which is how
+     * a page receives `int $id` and a repository without a `defaults` workaround.
+     *
      * @param class-string<View\Layout> $layout
      * @param array<string, mixed>       $data
      */
@@ -365,19 +391,52 @@ final class Application
     {
         $request ??= $this->context?->request ?? Request::capture();
 
+        $params = $this->params ?? new RouteParams();
+        $merged = $params->merge($data);
+
         $markup = new $layout(
             app: $this,
             request: $request,
-            data: $data,
+            data: $merged,
             session: $this->container->get(Session::class),
             csrf: $this->csrf,
         );
+
+        $this->mountLayout($markup, $merged);
 
         $body = $markup->render();
 
         return ($this->context?->response ?? new Response())
             ->setStatus(200)
             ->setBody($body instanceof Element ? $body->render() : $body->get());
+    }
+
+    /**
+     * Give a layout its parameters, if it asks for them.
+     *
+     * `mount()` is deliberately **not** declared on {@see View\Layout}: a fixed
+     * signature there would make every override with arguments a fatal
+     * signature violation. Declaring it here by reflection keeps each page free
+     * to declare exactly the parameters it needs.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function mountLayout(object $layout, array $params): void
+    {
+        if (!method_exists($layout, 'mount')) {
+            return;
+        }
+
+        // `Container::call()` needs a callable, so a non-public `mount()` would
+        // otherwise surface as a bare TypeError about array vs callable.
+        if (!(new \ReflectionMethod($layout, 'mount'))->isPublic()) {
+            throw new \LogicException(sprintf(
+                '%s::mount() must be public to receive route parameters.',
+                $layout::class
+            ));
+        }
+
+        $this->container->call([$layout, 'mount'], $params);
     }
 
     /**
@@ -388,6 +447,44 @@ final class Application
     public function use(string|Middleware ...$layers): self
     {
         $this->pipeline->push(...$layers);
+
+        return $this;
+    }
+
+    /**
+ * Find the routes declared with `#[Route]` under a directory.
+     *
+     * A **class-level** attribute means "this URL renders this class" — normally a
+     * Layout, which the framework renders for you. A **method-level** one names
+     * the method to call.
+     *
+     *     $app->discover(__DIR__, __NAMESPACE__);
+     *
+     * Discovered routes are committed in specificity order once the scan
+     * finishes, so `/todos/new` beats `/todos/{id}` regardless of which file
+     * happened to sort first. Call this after any {@see registrar()} calls you
+     * want sorted too — both share the same table.
+     *
+     * @param class-string $namespace the namespace `$directory` maps to
+     */
+    public function discover(string $directory, string $namespace): self
+    {
+        RouteRegistry::discover($this->routes, $directory, $namespace);
+        $this->routes->commitDiscovered();
+
+        return $this;
+    }
+
+    /**
+     * Register routes declared explicitly.
+     *
+     * @param RouteRegistrar|class-string<RouteRegistrar> $registrar
+     */
+    public function registrar(RouteRegistrar|string $registrar): self
+    {
+        $instance = $registrar instanceof RouteRegistrar ? $registrar : $this->container->get($registrar);
+
+        $instance->register($this->routes);
 
         return $this;
     }

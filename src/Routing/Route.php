@@ -33,6 +33,7 @@ final class Route
      *                                            or `[Controller::class, 'method']`
      * @param array<string, mixed>    $defaults   default parameters, and the source of parameter types
      * @param list<class-string|callable> $middleware
+     * @param int|null                $priority   orders discovered routes ahead of the specificity sort
      */
     public function __construct(
         public readonly string $method,
@@ -41,8 +42,31 @@ final class Route
         public readonly ?string $name = null,
         public readonly array $defaults = [],
         public readonly array $middleware = [],
+        public readonly ?int $priority = null,
+        public readonly string $description = '',
     ) {
         $this->verbs = $method === '*' ? Verb::cases() : [Verb::from(strtoupper($method)) ?? Verb::Get];
+    }
+
+    public function description(): string
+    {
+        return $this->description;
+    }
+
+    /**
+     * How many segments of this pattern are literal text rather than parameters.
+     */
+    public function literalSegments(): int
+    {
+        $literals = 0;
+
+        foreach (explode('/', trim($this->pattern, '/')) as $segment) {
+            if ($segment !== '' && !str_contains($segment, '{')) {
+                $literals++;
+            }
+        }
+
+        return $literals;
     }
 
     /**
