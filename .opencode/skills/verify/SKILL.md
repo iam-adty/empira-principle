@@ -80,7 +80,7 @@ JAR=tmp/verify-jar.txt && rm -f "$JAR"
 OUT=tmp/verify
 
 cd app
-FRANKENPHP_WORKERS=1 docker compose up -d --wait
+docker compose up -d --wait          # no worker override: this runs at 2 x CPU
 cd ..
 
 # the sign-in page, and the signed action its form carries
@@ -132,9 +132,23 @@ CSRF token, which looks exactly like a broken guard.
 
 ### 5. The session-isolation check
 
-The one that catches the bug class that matters, and the reason the stack runs
-with `FRANKENPHP_WORKERS=1` above. One worker means every request is guaranteed
-the same PHP process, so anything carrying over is unambiguous.
+The one that catches the bug class that matters. It runs at the **real default**,
+2 × CPU workers, because that is what ships — but read this before trusting a
+green result.
+
+**A green run is not proof of isolation.** A per-worker state leak only shows
+itself when two consecutive requests for one session land on the *same* worker,
+which at 32 workers is about 1 chance in 32. Ten rounds catch roughly a quarter
+of such a bug; they do not eliminate it. Anything that would fail here
+intermittently in production will usually pass here.
+
+When a state bug is suspected, make this check deterministic:
+
+```bash
+cd app && FRANKENPHP_WORKERS=1 docker compose up -d --force-recreate --wait && cd ..
+```
+
+One worker makes every request share a process, so a leak cannot hide.
 
 ```bash
 JAR=tmp/verify-session.txt && rm -f "$JAR"
@@ -149,14 +163,14 @@ curl -s -o /dev/null -b "$JAR" -c "$JAR" -X POST "$B$URL" \
   --data-urlencode 'email=ada@example.com' \
   --data-urlencode 'password=correct horse battery staple'
 
-for i in 1 2 3; do
+for i in $(seq 1 10); do
   a=$(curl -s -b "$JAR" -o /dev/null -w '%{http_code}' "$B/dashboard")
   b=$(curl -s -o /dev/null -w '%{http_code}' "$B/dashboard")
   echo "round $i   signed-in:$a   anonymous:$b"
 done
 ```
 
-Expected: `signed-in:200   anonymous:302`, three times. Anything else — and in
+Expected: `signed-in:200   anonymous:302`, ten times. Anything else — and in
 particular a `200` for the anonymous request — is one visitor being served
 another's session, which is the failure this whole gate exists to catch.
 

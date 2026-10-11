@@ -137,8 +137,8 @@ Either server works; pick by what you are chasing. From the **workspace root**:
 
 ```bash
 # The worker stack — what the app actually runs on, and live: the source is
-# mounted and watched, so an edit is an edit without a rebuild.
-cd app && FRANKENPHP_WORKERS=1 docker compose up -d --wait && cd ..
+# mounted and watched, so an edit is an edit without a rebuild. 2 × CPU workers.
+cd app && docker compose up -d --wait && cd ..
 B=http://127.0.0.1:8080
 
 # …or the built-in server, if you want no Docker at all. Classic mode, one
@@ -148,9 +148,17 @@ B=http://127.0.0.1:8000
 (cd app && php -S 127.0.0.1:8000 -t public public/index.php &)
 ```
 
-`FRANKENPHP_WORKERS=1` matters: with one worker every request is guaranteed the
-same PHP process, so state carrying between them shows up instead of hiding
-behind a thread rotation.
+**If the bug is state carrying between requests, force one worker.** At 2 × CPU
+a leak only shows up when two consecutive requests for one session land on the
+same worker — about 1 in 32 — so it will hide from you exactly when you are
+looking for it:
+
+```bash
+cd app && FRANKENPHP_WORKERS=1 docker compose up -d --force-recreate --wait && cd ..
+```
+
+One worker makes every request share a process, so the symptom cannot hide. Put
+it back afterwards without the variable.
 
 ```bash
 mkdir -p tmp
