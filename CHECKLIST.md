@@ -61,6 +61,17 @@ Current: **744 framework tests / 1372 assertions**, **24 app tests / 76 assertio
 - ~~Group middleware was attached but never executed~~
 - ~~Session rotated its flash buckets on every access~~
 - ~~`validate()` fired its event even on success~~
+- ~~A session outlived the request that opened it, leaking between users in a worker~~
+- ~~The context outlived its request, so a view between requests mutated a sent response~~
+- ~~Middleware instances froze the first request's `Format` and `Auth`~~
+- ~~A worker's statement log grew without bound~~
+
+### Long-running workers — 2026-10-11
+- ~~`Session::beginRequest()` resets between requests; five tests fail without it~~
+- ~~`Response::emit()` — a non-exiting send, so a worker survives more than one request~~
+- ~~The context is cleared in a `finally`~~
+- ~~The connection's statement log is cleared per request~~
+- ~~The shared-store rule: worker memory holds only re-derivable data~~
 
 ---
 
@@ -130,6 +141,18 @@ header at all**, so a wildcard resolves to HTML. Verified against
   ambient credential, plus a per-route `#[Route(csrf: false)]`. A
   session-authenticated POST with no token is still refused, and a test fails
   if that ever changes.
+- **Explicit session write-back `[planned]`** — `handle()` opens the session and
+  never closes it, so the save is FrankenPHP's per-request teardown rather than
+  ours. Verified working, and resting on undocumented runtime behaviour our own
+  `beginRequest()` contradicts. At 2 × CPU a deferred write-back would lose a
+  sign-in 31 times in 32. Design, evidence and the fix:
+  [SPEC.md §4](SPEC.md#4-explicit-session-write-back-planned).
+- **Session isolation is only probabilistically checked at the default.** The
+  stack ships 2 × CPU workers, and `verify` no longer pins one, so a per-worker
+  state leak surfaces only when two consecutive requests for one session land on
+  the same worker — about 1 in 32. Ten rounds catch roughly a quarter of such a
+  bug. Re-run the check with `FRANKENPHP_WORKERS=1` whenever a state bug is
+  suspected; the override is kept for exactly that.
 
 ---
 
