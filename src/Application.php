@@ -605,6 +605,33 @@ final class Application
     }
 
     /**
+     * Make every component under `$namespace` reachable by token.
+     *
+     * The counterpart to {@see discover()}, and the reason composition does not
+     * cost a registration per component:
+     *
+     *     $app->components(__NAMESPACE__);
+     *
+     * A component that is only ever reached through another one still answers
+     * its own action URLs, because a token naming its class resolves without
+     * anyone having listed it. Registering each nested component by hand used
+     * to be the price of nesting, and the price was paid for components whose
+     * only error was being forgotten.
+     *
+     * Prefer this over `$app->registry()->add(...)`. An alias is still worth
+     * having for a component whose token should stay short, or survive the class
+     * moving namespaces.
+     *
+     * @param class-string|string $namespace
+     */
+    public function components(string $namespace): self
+    {
+        $this->registry->allowNamespace($namespace);
+
+        return $this;
+    }
+
+    /**
      * Register routes declared explicitly.
      *
      * @param RouteRegistrar|class-string<RouteRegistrar> $registrar
