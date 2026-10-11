@@ -116,7 +116,10 @@ final class Counter extends Component
 }
 ```
 
-Then **register it** — a token cannot resolve a class the registry does not know:
+Then **make it reachable**. A token cannot resolve a class the registry does
+not know — and if the application called `$app->components(__NAMESPACE__)`,
+which most do, the class is already in scope and there is nothing to do. An
+`alias()` is for a token that should be short or rename-safe:
 
 ```php
 $app->registry()->alias('counter', Counter::class);

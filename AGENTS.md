@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `746 tests, 1376 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `771 tests, 1413 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -48,7 +48,7 @@ proves nothing.
 | `src/ElementFactory.php` | Creates elements, optionally wired to a component's action resolver |
 | `src/Raw.php` | A string emitted verbatim, bypassing escaping |
 | `src/Html.php` | Escaping, attribute serialisation, JSON |
-| `src/Registry.php` | Allow-list of classes a token may resolve to |
+| `src/Registry.php` | What a token may resolve to: by alias, by class, or by namespace |
 | `src/TokenCodec.php` | HMAC-signed component identity (`base64url(payload).base64url(hmac)`) |
 | `src/Router.php` | Resolves an action URL back to a component and runs the action |
 | `src/functions.php` | The global `hx()` helper |
@@ -71,7 +71,7 @@ proves nothing.
 
 Break one of these and a component becomes exploitable or silently broken.
 
-1. **A token may only resolve a registered class.** `Registry` is the security boundary. Never construct a component from a class name without going through it.
+1. **A token may only resolve a reachable class.** `Registry` is the security boundary. Never construct a component from a class name without going through it. Reachable means an alias, an exact class, or a `Component` under a namespace given to `$app->components()` — nothing else, and nothing that is not a `Component`.
 2. **The HMAC covers the props.** If that stops covering them, a client can promote itself by editing a URL.
 3. **Actions must be reachable only if declared.** `actions()` or `#[Action]`/a verb attribute. Public + not declared by the framework base = refused.
 4. **Private, static and inherited-from-`Component` methods are never callable as actions**, regardless of how they are declared.

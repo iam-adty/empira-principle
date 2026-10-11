@@ -32,16 +32,40 @@ server-side session.
 
 ## The registry is the boundary
 
-A token names a class. Without a check, a crafted request could name any class on
-the autoloader and have it instantiated.
+A token names a class. Without a check, a token could name any class on the
+autoloader and have it instantiated.
+
+There are two ways in, and both end in the same check.
 
 ```php
-$app->registry()->alias('counter', Counter::class);   // registered → reachable
+// One component, named. Short token, survives the class moving namespaces.
+$app->registry()->alias('counter', Counter::class);
+
+// Or a whole tree, named once. No per-component bookkeeping.
+$app->components(__NAMESPACE__);
 ```
 
-Anything unregistered raises `UnknownComponentException` **before `new` is
-ever reached**. Aliases are short and rename-safe: moving a class between
-namespaces does not invalidate existing links.
+The second is why nesting is free: a component that only another one renders
+still answers its own action URLs, instead of rendering perfectly and then 404-ing
+when somebody presses its button.
+
+Anything unreachable raises `UnknownComponentException` **before `new` is ever
+reached** — including a class that lives under an allowed namespace but is not a
+`Component`, which is the check that keeps the rule from being "anything under
+this prefix".
+
+**What the namespace rule gives up.** It says which *code* is in scope, not that
+you meant each class. An internal component sitting in that namespace is
+reachable if the secret leaks, where an alias list would not include it. That is
+the deliberate trade for not writing down every component, and the reason
+`vendor/` is covered by nothing but an explicit `allowNamespace()` — a
+third-party component package opts in by name rather than arriving pre-authorised.
+
+What it does not weaken is what actually stops a client. The HMAC means a token
+can only ever be replayed, never minted; a client cannot choose the class at all.
+
+Aliases remain worth having: an unaliased component's token carries its
+fully-qualified name, which is longer in every action URL.
 
 ## Which methods are reachable
 

@@ -245,3 +245,58 @@ Every entry needs a status marker, and a marker has to move. When an item ships:
 4. Delete it from here — a shipped item still listed as planned is worse than no document.
 
 A specification that describes software which does not exist is the most expensive kind of documentation to keep.
+---
+
+## 5. Composition and reachability `[shipped]`
+
+### The problem
+
+Two designs met and neither was right. Components composed by rendering each
+other — `renderComponent()` returned markup — and a token named a class the
+registry had been told about, one alias at a time. The seam between them was the
+trap: a nested component was built directly, so nothing looked wrong, but the
+token in its action URL named the class and was resolved through the registry
+when the button was pressed. An application paid a registration per component
+it nested, and the symptom was a 404 that looked like the framework was broken.
+
+Registration could not simply be dropped. Reachability has to be known *before
+the first request*, and a component tree only exists once something renders —
+which, under the 32 workers the reference application ships, is usually a
+different process from the one that handles the action.
+
+### The design
+
+**Reachability is a namespace, not a list. Composition hands back components,
+not markup.**
+
+```php
+$app->components(__NAMESPACE__);   // every Component under it, named once
+
+$logout = $this->child(LogoutButton::class);   // a live component
+return $this->hx->nav()->append($logout->markup());
+```
+
+`Registry::resolve()` falls back to a namespace match, still requiring a
+`Component`; `nameFor()` already returned the fully-qualified name for an
+unregistered class, so the two halves met without changing it. `initialise()`
+is split so `child()` can prepare without rendering, and `renderComponent()`
+becomes shorthand for `child()->markup()`.
+
+### What it costs
+
+Token length: an unaliased component carries its fully-qualified name in every
+action URL. `alias()` remains for short tokens and for rename-safety.
+
+Security: the rule says which *code* is in scope, not that you meant each class.
+An internal component under the namespace is reachable if the secret leaks,
+where an alias list would not include it. `vendor/` is covered only by an
+explicit `allowNamespace()`, so a third-party component package opts in by name.
+The HMAC is unchanged, and it is what actually stops a client — a token can only
+be replayed, never minted.
+
+### Files
+
+- `src/Registry.php` — `allowNamespace()`, the `resolve()` fallback
+- `src/Application.php` — `components()`
+- `src/Component.php` — `prepare()`, `child()`, `children()`
+- `tests/RegistryTest.php`, `tests/CompositionTest.php`

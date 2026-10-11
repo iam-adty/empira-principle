@@ -44,7 +44,15 @@ final class Counter extends Component
 }
 ```
 
-Register it — a token cannot resolve a class the registry does not know:
+Make it reachable — the application names which namespace is in scope, once:
+
+```php
+$app->components(__NAMESPACE__);
+```
+
+A token for a component with no alias carries its fully-qualified name, which is
+longer in every action URL. Add an alias when that matters, or when the token
+should survive the class moving namespaces:
 
 ```php
 $app->registry()->alias('counter', Counter::class);
@@ -247,11 +255,15 @@ protected function renderComponent(string $class, array $props = []): Element|Ra
 Builds another component with the same context, so a page can be assembled from
 parts without the parent knowing their URLs.
 
-**A nested component still has to be registered.** `renderComponent()` builds it
-directly, but the token its action URL carries names the class and is resolved
-through the {@see \IamAdty\Empira\Registry} when the action fires. An
-unregistered nested component renders perfectly and then answers 404 the moment
-its button is pressed — which is a confusing way to find out.
+**A nested component does not need registering.** This used to be the sharpest
+trap in the framework: `renderComponent()` built the child directly, so nothing
+looked wrong, but the token in its action URL named the class and was resolved
+through the {@see \IamAdty\Empira\Registry} when the button was pressed. An
+unregistered nested component rendered perfectly and then answered 404 — a
+confusing way to find out, and paid for by applications that had to register
+every component they ever nested. `$app->components()` removes the
+registration; what it does not remove is the need for the class to be under the
+allowed namespace.
 
 ## Styling
 

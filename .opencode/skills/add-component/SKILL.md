@@ -1,6 +1,6 @@
 ---
 name: add-component
-description: Use when adding or changing an Empira component — creating a class extending Component, adding #[Prop] typed state, adding #[Get]/#[Post]/#[Put]/#[Patch]/#[Delete] actions, wiring ->action() elements, or registering a component alias. Covers the escaping rule, the token round trip, and the mandatory registry alias.
+description: Use when adding or changing an Empira component — creating a class extending Component, adding #[Prop] typed state, adding #[Get]/#[Post]/#[Put]/#[Patch]/#[Delete] actions, wiring ->action() elements, or making it reachable by token. Covers the escaping rule, the token round trip, and composition.
 ---
 
 # Adding an Empira component
@@ -75,19 +75,31 @@ final class TodoList extends Component
 }
 ```
 
-## Register it — not optional
+## Make it reachable
+
+The application says which namespace is in scope, once:
+
+```php
+$app->components(__NAMESPACE__);
+```
+
+Every `Component` under it can then be named by a token, **including one you
+only ever nest**. That used to need an alias per component, which is why this
+section used to be titled "not optional" and why it warned that a nested
+component renders perfectly and then answers 404 when somebody presses its
+button. That warning described the registration list, not the framework; it is
+gone.
+
+An alias is still worth having for two reasons:
 
 ```php
 $app->registry()->alias('todos', TodoList::class);
 ```
 
-Without this the token cannot resolve the class and the request 403s.
-
-**This includes a component you only ever nest.** `renderComponent()` builds it
-directly, so nothing looks wrong — but its action URL carries a token naming the
-class, and that token is resolved through the registry when the button is
-pressed. An unregistered nested component renders perfectly and then answers
-404 the first time anyone clicks it.
+- **Short tokens.** Without one, the token carries `App\Components\TodoList`,
+  in every action URL, for every button.
+- **Rename-safety.** Aliases outlive the class moving namespaces; tokens already
+  in users' histories do not.
 
 ## State: `#[Prop]` or the props array
 

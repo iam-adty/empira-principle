@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status: describes shipped code.** Verified against `746 tests, 1376 assertions`.
+> **Status: describes shipped code.** Verified against `771 tests, 1413 assertions`.
 > Planned changes are in [SPEC.md](SPEC.md).
 
 How a request flows through Empira, and why it is built this way.
@@ -34,7 +34,7 @@ Empira inverts it. **The PHP class is the source of truth.** The class declares 
       Router::dispatch()                        container->call(handler, params)
                  │                                       │
       1. TokenCodec::decode()  — verify HMAC         returns string | Element | Response
-      2. Registry::resolve()    — allow-list              │
+      2. Registry::resolve()    — reachability            │
       3. new Component(...)     — build from props            │
       4. guardAction()          — declared? public? verb?     │
       5. beforeAction()         — CSRF verify                 │
@@ -98,15 +98,21 @@ The cost is URL length. A component that opts into `stateful()` moves its props 
 
 ## Why the allow-list exists
 
-A token carries a class name. Without a check, a crafted request could name any class on the autoloader and have it instantiated. `Registry` sits in front of that:
+A token carries a class name. Without a check, it could name any class on the autoloader and have it instantiated. `Registry` sits in front of that:
 
 ```php
+$app->components(__NAMESPACE__);     // every Component under it, named once
+
 $app->registry()
-    ->alias('counter', Counter::class)      // short, rename-safe name in the URL
+    ->alias('counter', Counter::class)      // or one at a time, short and rename-safe
     ->alias('todos', TodoList::class);
 ```
 
-Aliases keep tokens short and survive a namespace move — renaming a class does not invalidate links sitting in users' histories. Anything unregistered is refused before `new` is reached.
+The namespace form is why nesting costs nothing: a component only ever rendered
+by another one still answers its own action URLs. The rule says which *code* is
+in scope, not that you meant each class — a class under the namespace that is not
+a `Component` is still refused. Anything unreachable is refused before `new` is
+reached.
 
 ## Why routing is first-match-wins
 

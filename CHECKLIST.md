@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **746 framework tests / 1376 assertions**, **24 app tests / 76 assertions**.
+Current: **771 framework tests / 1413 assertions**, **24 app tests / 76 assertions**.
 
 ---
 
@@ -65,6 +65,12 @@ Current: **746 framework tests / 1376 assertions**, **24 app tests / 76 assertio
 - ~~The context outlived its request, so a view between requests mutated a sent response~~
 - ~~Middleware instances froze the first request's `Format` and `Auth`~~
 - ~~A worker's statement log grew without bound~~
+
+### Composition — 2026-10-11
+- ~~`$app->components(__NAMESPACE__)` — reachable by namespace, not by a list~~
+- ~~`Component::child()` returns the child; `children()` reports what was composed~~
+- ~~A nested component needs no registration — the 404 trap is gone~~
+- ~~`renderComponent()` is shorthand for `child()->markup()`~~
 
 ### Long-running workers — 2026-10-11
 - ~~`Session::beginRequest()` resets between requests; five tests fail without it~~

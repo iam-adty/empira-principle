@@ -23,6 +23,27 @@ can change without a major bump, though changes are always documented here.
 - **A documented worker-safety contract.** What the framework resets per
   request, what it deliberately keeps, and the rules for holding new code to
   it — [docs/workers.md](docs/workers.md).
+- **`$app->components(__NAMESPACE__)` — reachability by namespace.** Every
+  `Component` under a prefix becomes reachable by token without being named.
+  Registration had become the price of nesting, and it was paid for components
+  whose only fault was being forgotten: a component only ever rendered by another
+  one rendered perfectly and then answered 404 when somebody pressed its button.
+
+  The rule says which *code* is in scope, not that you meant each class — a class
+  under the prefix that is not a `Component` is still refused, and `vendor/` is
+  covered by nothing but an explicit `allowNamespace()`. What it gives up is
+  "you meant this specific one": an internal component in that namespace is
+  reachable if the secret leaks, where an alias list would not include it. The
+  HMAC is unchanged and is what actually stops a client, since a token can only
+  be replayed, never minted.
+- **`Component::child()` returns the child, and `children()` reports what a
+  component composed.** Composite means a component containing components is the
+  same kind of thing as one that does not, and that only holds if the parent can
+  hold the children rather than their rendered markup. `renderComponent()` is
+  now shorthand for `child()->markup()`, and still works.
+
+  A component may be composed without ever registering it, which is what makes
+  nesting free.
 - **A component may carry its own stylesheet.** `Component::styles()` is emitted
   inside the component's root element — which is the swap target — so the CSS
   arrives again with every htmx swap. A sheet in `<head>` would be gone the
