@@ -27,7 +27,9 @@ php bin/empira make:component Counter            # generators write to src/compo
 php bin/empira route:list                        # routes an app registers
 ```
 
-There is no CI config yet. **The test suite is the only gate** — run it before you claim something works.
+`.github/workflows/tests.yml` runs the suite on PHP 8.4 and 8.5 for every push
+and pull request. **It is still the only gate** — a green run means the suite
+passed, not that the change was right.
 
 ## Where things live
 

@@ -3,8 +3,9 @@
 > **Status: describes shipped code.** Conventions below are what the code
 > actually does; new code is expected to match.
 
-Thanks for looking. This is a young framework with no CI yet, so the test suite
-is the only gate — please run it before claiming something works.
+Thanks for looking. This is a young framework, and the test suite is still the
+gate — CI runs it on PHP 8.4 and 8.5, but a green run only means the suite
+passed. Please run it yourself before claiming something works.
 
 ## Setup
 
