@@ -70,7 +70,7 @@ final class RouteRegistry
 
         // Class-level attributes render the class itself — the page/URL case.
         foreach (self::attributesOf($reflection) as $attribute) {
-            $routes->addDiscovered($attribute, $class, null, $derived, $reflection->getShortName());
+            $routes->addDiscovered($attribute, $class, null, $derived);
         }
 
         // Method-level attributes name the method to call.
@@ -79,16 +79,10 @@ final class RouteRegistry
                 continue;
             }
 
-            $methodDerived = strtolower(preg_replace('/(?<!^)[A-Z]/', '-$0', $method->getName()) ?? $method->getName());
+            $methodDerived = self::kebab($method->getName());
 
             foreach (self::attributesOf($method) as $attribute) {
-                $routes->addDiscovered(
-                    $attribute,
-                    $class,
-                    $method->getName(),
-                    $derived . '.' . $methodDerived,
-                    $reflection->getShortName() . '::' . $method->getName()
-                );
+                $routes->addDiscovered($attribute, $class, $method->getName(), $derived . '.' . $methodDerived);
             }
         }
     }

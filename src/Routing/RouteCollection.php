@@ -106,7 +106,6 @@ final class RouteCollection
         string $class,
         ?string $method,
         string $derivedName,
-        string $description,
     ): void {
         $handler = $method === null ? $class : [$class, $method];
 
@@ -122,7 +121,6 @@ final class RouteCollection
                 name: $attribute->name ?? $derivedName,
                 middleware: $attribute->middleware,
                 priority: $attribute->priority,
-                description: $description,
             );
         }
     }

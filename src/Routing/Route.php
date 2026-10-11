@@ -43,14 +43,8 @@ final class Route
         public readonly array $defaults = [],
         public readonly array $middleware = [],
         public readonly ?int $priority = null,
-        public readonly string $description = '',
     ) {
         $this->verbs = $method === '*' ? Verb::cases() : [Verb::from(strtoupper($method)) ?? Verb::Get];
-    }
-
-    public function description(): string
-    {
-        return $this->description;
     }
 
     /**
