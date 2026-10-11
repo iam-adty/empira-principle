@@ -120,8 +120,11 @@ header at all**, so a wildcard resolves to HTML. Verified against
   published package carries `src/`, `docs/`, `bin/` and the markdown docs. The
   skills point at this repository's own `tests/` paths, which do not exist in a
   consumer's `vendor/`; contributors get them from the git checkout~~
-- [ ] Push both repositories to a remote — no remote is configured; local git only
-  by decision
+- ~~Push both repositories to a remote~~ — **not doing it.** Local git only, by
+  decision. Nothing has ever been pushed, no tag exists, and the suite is the
+  gate because there is nowhere for it to run otherwise. Revisit only if the
+  package is actually published to Packagist; the published tarball's shape is
+  already fixed above, and a first release would need that constraint changing.
 
 ### 5. Deferred, by decision
 - ~~`Format::Auto` override on `#[Route]`~~ — **not adding it.** htmx's
