@@ -153,6 +153,30 @@ protected function title(): string
 }
 ```
 
+When the data arrives from the URL, a layout can ask for it by name in
+`mount()` instead of reaching into `$this->data`:
+
+```php
+#[Route('/todos/{id}')]
+final class TodoLayout extends Layout
+{
+    public function mount(TodoRepository $todos, int $id): void
+    {
+        $this->todo = $todos->findOrFail($id);
+    }
+}
+```
+
+Parameters are matched from the path; anything typed as a class is autowired,
+so `Request`, `RouteParams` and your own services are all available by type.
+`mount()` must be `public`, and `Layout` deliberately does not declare it — a
+fixed signature in the base class would make every override with arguments a
+fatal signature violation.
+
+Matched parameters are also available as data, so a region can read
+`$region->data('id')` with no `mount()` at all. See
+[routing.md](routing.md#mount--typed-parameters).
+
 ## CSRF belongs in the layout
 
 One attribute on `<body>` is inherited by everything below it, which is how the
