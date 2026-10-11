@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: describes shipped code.** `616 tests, 1117 assertions`.
+> **Status: describes shipped code.** `744 tests, 1372 assertions`.
 
 ## Running
 
@@ -148,19 +148,28 @@ feature. `src/View/` had no test file at all.
 
 ## Temporary directories
 
-Scratch files go in **`tmp/`**, inside the repository — not `sys_get_temp_dir()`.
-`Tests\Temp` creates the folder and hands out a unique name each time:
+Scratch files go in the **workspace** `tmp/` — the folder above `principle/` and
+`app/` — and not in `sys_get_temp_dir()`. `Tests\Temp` creates it and hands out
+a unique name each time:
 
 ```php
 $path = Temp::file('empira-env');      // a unique file in tmp/
 $directory = Temp::dir('empira-log-'); // a unique directory, created
 ```
 
-Two reasons it is not `/tmp`: a failing run leaves its fixtures somewhere you
-would think to look, and `tmp/` is visible from **both** places this suite runs
-— the host, and the test container where the repository is mounted at `/app`.
-`dirname(__DIR__)` resolves correctly from either, so no environment variable
-and no extra volume are involved.
+`Temp::root()` is `dirname(__DIR__, 2) . '/tmp'` — two levels up from `tests/`,
+because the folder sits above the package rather than inside it. Both
+containers mount the workspace at `/workspace`, so the container's layout
+matches the host's exactly and the same relative path resolves in all three
+places. No environment variable, and no mount kept in step with it by hand.
+
+That location buys three things over `/tmp`:
+
+- A failing run leaves its fixtures in the workspace, where you would look.
+- Both suites share one folder, so a stray file is traceable to whichever ran.
+- It lives outside both Git repositories, so a fixture **cannot** be committed.
+  The old per-package `tmp/.gitignore` made the same promise by declaration;
+  this one holds by construction.
 
 `finally` still matters, or a failing assertion leaves the file behind:
 
@@ -176,6 +185,10 @@ try {
 creating its own parent directories, say. It is also how the suite keeps
 `tmp/` empty: if something is left there after a run, a test failed partway and
 that is the clue.
+
+One file legitimately survives — `.boot.lock`, the lock the demo application
+takes around migrations and seeding, sitting beside the database it guards. It is
+not a leftover.
 
 ## Without a session
 

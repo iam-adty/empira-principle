@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace IamAdty\Empira\Tests;
 
 /**
- * Scratch files, inside the repository rather than the system temp directory.
+ * Scratch files, inside the workspace rather than the system temp directory.
  *
  * `sys_get_temp_dir()` works, but a failing run leaves its fixtures somewhere
- * nobody thinks to look, and two runs can collide. Here, `principle/tmp/` is
- * visible in both places the suite runs from — on the host, and inside the test
- * container where the repository is mounted at `/app` — so what the suite wrote
- * is where you would go to look for it.
+ * nobody thinks to look, and two runs can collide. Here the workspace `tmp/` is
+ * visible from **every** place this suite runs from — on the host, and in the
+ * test container, where the whole workspace is mounted at `/workspace` the same
+ * way it sits on disk. One relative path, one meaning, no environment variable
+ * to keep in step with it.
  *
- * The directory is committed as an empty folder so `tempnam()` has somewhere to
- * write on a fresh clone; {@see Temp::root()} creates it regardless.
+ * That shared layout is the reason for two details below. The framework is a
+ * library that ships to Packagist, so nothing here may assume where anyone
+ * checked it out; the path is derived, never configured. And because the folder
+ * lives above the package rather than inside it, a fixture cannot be committed
+ * by accident — the protection is structural, not a `.gitignore` somebody has
+ * to remember to update.
  *
  *     $directory = Temp::dir('empira-console-');   // unique, created
  *     $file = Temp::file('empira-env');            // unique file
@@ -86,15 +91,16 @@ final class Temp
     }
 
     /**
-     * This package's `tmp/`, created if it is not there.
+     * The workspace `tmp/`, created if it is not there.
      *
-     * `dirname(__DIR__)` rather than an environment variable, because the same
-     * test files run from two places — the host, and the container where the
-     * repository sits at `/app` — and both must resolve to the same folder.
+     * Two levels up, because the shared folder sits above the package: `tests/`
+     * → the package root → the workspace. That is also what makes it resolve
+     * unchanged inside the container, where the workspace is mounted at
+     * `/workspace` and this file is at `/workspace/principle/tests/Temp.php`.
      */
     public static function root(): string
     {
-        $root = dirname(__DIR__) . '/tmp';
+        $root = dirname(__DIR__, 2) . '/tmp';
 
         if (! is_dir($root) && ! mkdir($root, 0o777, true) && ! is_dir($root)) {
             throw new \RuntimeException(sprintf('Could not create the temporary directory at %s.', $root));

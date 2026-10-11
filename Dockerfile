@@ -25,7 +25,12 @@ RUN apt-get update \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /app
+# WORKDIR is the package's place *inside the workspace*, not the root of it,
+# because the suite shares a scratch folder with the app: `Temp::root()` is two
+# levels up from `tests/`, so the container must lay the workspace out exactly
+# as the host does. `/workspace/tmp` here is `../tmp` next to this file. Every
+# COPY below is relative to WORKDIR and needs no change.
+WORKDIR /workspace/principle
 
 # Dependencies first: this layer is only rebuilt when composer.json changes, so
 # editing a test does not re-download PHPUnit.

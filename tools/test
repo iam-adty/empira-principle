@@ -62,4 +62,11 @@ MESSAGE
     fi
 fi
 
-exec docker compose run --rm php "$@"
+# `--name` because the runner is a one-off container: Compose ignores
+# `container_name` for these, so `docker ps` would otherwise show a generated
+# `empira-principle-php-run-<hash>`. The name is worth having for `docker logs`
+# while a run is in flight.
+#
+# Deliberately no `--build`. The source is mounted from the host, so an edit is
+# an edit in the runner and the image is built once, not per run.
+exec docker compose run --name empira-principle --rm php "$@"

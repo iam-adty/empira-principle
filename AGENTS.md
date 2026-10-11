@@ -80,6 +80,17 @@ Break one of these and a component becomes exploitable or silently broken.
 
 ## Conventions
 
+- **Edit source with the Edit tool.** Not `sed -i`, not `python3 -c`, not a
+  heredoc that rewrites a file. Those have no review step, they fail silently
+  when the pattern does not match, and they leave a half-applied file when they
+  do. Shell is for *reading* — `grep`, `find`, `git diff`, `php -l`.
+- **Never rebuild to test a code change.** `principle/src` is bind-mounted into
+  both the test runner and the app stack, and the worker watches it. Only a
+  `composer.json` change, a Dockerfile change, or a fresh clone needs
+  `docker compose build`.
+- **Scratch goes in the workspace `tmp/`**, never `/tmp` — it is outside the
+  working directory, so every use raises an `external_directory` prompt, and a
+  failed run leaves its evidence out of sight.
 - `declare(strict_types=1);` first in every PHP file.
 - `final class` or `enum`. An interface only where there is genuinely more than one implementation.
 - Constructor property promotion, `private readonly` where the value never changes.

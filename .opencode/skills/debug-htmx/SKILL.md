@@ -50,17 +50,17 @@ curl -s localhost:8000/ | grep -o 'hx-headers="[^"]*"'
 
 The token lives in the session. Reproduce with a cookie jar:
 
-Scratch files go in the package's own `tmp/`, not `/tmp`, so a failed
-reproduction leaves its evidence where you will look for it. Run from the
-**workspace root**:
+Scratch goes in the workspace `tmp/`, not `/tmp` — it sits above both packages
+and is mounted into every container, so a failed reproduction leaves its
+evidence where you will look for it. Run from the **workspace root**:
 
 ```bash
-mkdir -p ../principle/tmp
-JAR=../principle/tmp/htmx-j.txt && rm -f $JAR
-curl -s -c $JAR -o ../principle/tmp/page.html localhost:8000/login
-CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' ../principle/tmp/page.html \
+mkdir -p tmp
+JAR=tmp/htmx-j.txt && rm -f "$JAR"
+curl -s -c "$JAR" -o tmp/page.html localhost:8000/login
+CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' tmp/page.html \
        | head -1 | grep -oE '[a-f0-9]{40,}')
-curl -s -b $JAR -c $JAR -X POST "http://localhost:8000/<action-url>" \
+curl -s -b "$JAR" -c "$JAR" -X POST "http://localhost:8000/<action-url>" \
   -H 'HX-Request: true' -H "X-CSRF-Token: $CSRF"
 ```
 
@@ -133,23 +133,40 @@ shipped once. Check `src/View/Layout.php`.
 
 ## A fast harness
 
+Either server works; pick by what you are chasing. From the **workspace root**:
+
 ```bash
-php -S 127.0.0.1:8000 -t ../app/public ../app/public/index.php &
-mkdir -p ../principle/tmp
-JAR=../principle/tmp/htmx-j.txt && rm -f $JAR
-PAGE=../principle/tmp/htmx-page.html
+# The worker stack — what the app actually runs on, and live: the source is
+# mounted and watched, so an edit is an edit without a rebuild.
+cd app && FRANKENPHP_WORKERS=1 docker compose up -d --wait && cd ..
+B=http://127.0.0.1:8080
+
+# …or the built-in server, if you want no Docker at all. Classic mode, one
+# request per process, and **not** a substitute for the worker when the bug is
+# about state carrying between requests.
+B=http://127.0.0.1:8000
+(cd app && php -S 127.0.0.1:8000 -t public public/index.php &)
+```
+
+`FRANKENPHP_WORKERS=1` matters: with one worker every request is guaranteed the
+same PHP process, so state carrying between them shows up instead of hiding
+behind a thread rotation.
+
+```bash
+mkdir -p tmp
+JAR=tmp/htmx-j.txt && rm -f "$JAR"
+PAGE=tmp/htmx-page.html
 
 # a full page, a fragment, then an action — against /login, which a guest
 # can reach without a session
-curl -s -c $JAR -o $PAGE localhost:8000/login
-CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' $PAGE | head -1 | grep -oE '[a-f0-9]{40,}')
-URL=$(grep -oE 'hx-post="[^"]*/login"' $PAGE | head -1 \
-      | sed 's/hx-post="//; s/"$//' | sed 's/&amp;/\&/g')
+curl -s -c "$JAR" -o "$PAGE" "$B/login"
+CSRF=$(grep -oE 'X-CSRF-Token&quot;:&quot;[a-f0-9]+' "$PAGE" | head -1 | grep -oE '[a-f0-9]{40,}')
+URL=$(grep -oE 'hx-post="/empira/[^"]+/login"' "$PAGE" | head -1 | cut -d'"' -f2)
 
 # the target is a component's own id, which the page renders for us
-TARGET=$(grep -oE 'id="e-[a-f0-9]+"' $PAGE | head -1 | sed 's/id="//; s/"//')
-curl -s -b $JAR "localhost:8000/login" -H 'HX-Request: true' -H "HX-Target: $TARGET"
-curl -s -b $JAR -c $JAR -X POST "localhost:8000$URL" \
+TARGET=$(grep -oE 'id="e-[a-f0-9]+"' "$PAGE" | head -1 | cut -d'"' -f2)
+curl -s -b "$JAR" "$B/login" -H 'HX-Request: true' -H "HX-Target: $TARGET"
+curl -s -b "$JAR" -c "$JAR" -X POST "$B$URL" \
   -H 'HX-Request: true' -H "X-CSRF-Token: $CSRF"
 ```
 

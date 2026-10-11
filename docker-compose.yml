@@ -14,6 +14,9 @@
 services:
   postgres:
     image: postgres:18-alpine
+    # The app's own database is `empira-db`; this one is the suite's, and says so
+    # rather than leaving `principle-postgres-1` to explain itself.
+    container_name: empira-principle-db
     environment:
       POSTGRES_USER: empira
       POSTGRES_PASSWORD: empira
@@ -35,6 +38,8 @@ services:
 
   php:
     build: .
+    # Named rather than left to Compose, which would call it `principle-php`.
+    image: empira/principle
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,13 +50,16 @@ services:
       EMPIRA_TEST_PGSQL_USER: empira
       EMPIRA_TEST_PGSQL_PASSWORD: empira
     volumes:
-      # The source is mounted so an edit on the host is an edit in the runner,
-      # with no image rebuild.
-      - .:/app
+      # The **workspace** is mounted, not just this package, so the layout inside
+      # the container matches the host: `/workspace/principle` and the shared
+      # `/workspace/tmp`. That is what lets `Temp::root()` be one relative path
+      # everywhere instead of an environment variable kept in step with the
+      # mounts by hand.
+      - ..:/workspace
       # An anonymous volume, so the source mount above does not shadow the
       # dependencies baked into the image. Without it a fresh clone with no
       # host `vendor/` would start the container with no PHPUnit at all.
-      - vendor:/app/vendor
+      - vendor:/workspace/principle/vendor
       - composer-cache:/root/.composer/cache
 
 volumes:
