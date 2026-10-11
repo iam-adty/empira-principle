@@ -1,0 +1,61 @@
+# Database services for the test suite.
+#
+# The suite is the project's only gate, and the parts of it that talk to a real
+# database need a real database. SQLite runs in-process and needs nothing here;
+# PostgreSQL needs the service below.
+#
+#   docker compose up -d --wait      # start
+#   docker compose run --rm php      # run the suite
+#   docker compose down -v           # stop and forget the volume
+#
+# MySQL is deliberately absent. Its grammar ships with unit tests over the SQL
+# it emits, but no test runs it against a live server — see docs/data.md.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: empira
+      POSTGRES_PASSWORD: empira
+      POSTGRES_DB: empira_test
+    ports:
+      - "127.0.0.1:5432:5432"
+    tmpfs:
+      # The database is a test fixture, not somewhere to keep data. PostgreSQL
+      # 18 places its cluster under this directory, so the mount has to be here
+      # rather than on the `data` subdirectory the older images used.
+      - /var/lib/postgresql
+    healthcheck:
+      # Without this the first run races the database and fails in a way that
+      # looks like a code bug.
+      test: ["CMD-SHELL", "pg_isready -U empira -d empira_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  php:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Consumed by the driver tests; absent means "no live database", and the
+      # suite says so rather than passing quietly.
+      EMPIRA_TEST_PGSQL_DSN: "pgsql:host=postgres;port=5432;dbname=empira_test"
+      EMPIRA_TEST_PGSQL_USER: empira
+      EMPIRA_TEST_PGSQL_PASSWORD: empira
+    volumes:
+      # The source is mounted so an edit on the host is an edit in the runner,
+      # with no image rebuild.
+      - .:/app
+      # An anonymous volume, so the source mount above does not shadow the
+      # dependencies baked into the image. Without it a fresh clone with no
+      # host `vendor/` would start the container with no PHPUnit at all.
+      - vendor:/app/vendor
+      - composer-cache:/root/.composer/cache
+
+volumes:
+  # Empty on purpose: Docker seeds it from the image on first use, and each
+  # fresh container gets a clean one.
+  vendor:
+  composer-cache:

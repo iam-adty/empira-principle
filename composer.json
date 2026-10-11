@@ -3,7 +3,13 @@
     "description": "A PHP framework where htmx lives in PHP classes, not HTML.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["htmx", "components", "hypermedia", "server-driven", "framework"],
+    "keywords": [
+        "htmx",
+        "components",
+        "hypermedia",
+        "server-driven",
+        "framework"
+    ],
     "require": {
         "php": "^8.4"
     },
@@ -30,7 +36,8 @@
         "bin/empira"
     ],
     "scripts": {
-        "test": "phpunit"
+        "test": "tools/test",
+        "test:sqlite": "tools/test --exclude-group driver"
     },
     "config": {
         "sort-packages": true

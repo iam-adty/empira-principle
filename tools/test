@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# Run the test suite in Docker.
+#
+# The rule this script exists to enforce: a green suite means the database
+# tests actually ran. A Postgres suite that silently skipped is a green tick
+# that means nothing, so the services are checked, started, and waited on —
+# and if they cannot be started, this stops and says so rather than reporting
+# a pass.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if ! command -v docker > /dev/null 2>&1; then
+    cat >&2 <<'MESSAGE'
+Docker is not on PATH, so the suite cannot run.
+
+The whole suite runs in Docker. Install Docker, or run the SQLite-only
+tests directly on a host PHP that has the extensions:
+
+    vendor/bin/phpunit --exclude-group driver
+
+MESSAGE
+    exit 1
+fi
+
+if ! docker info > /dev/null 2>&1; then
+    cat >&2 <<'MESSAGE'
+The Docker daemon is not responding.
+
+Start Docker (Docker Desktop, or `sudo systemctl start docker`) and run this
+command again.
+MESSAGE
+    exit 1
+fi
+
+# Anything up already? `ps --status running` is the question that matters; the
+# exit status of this command is deliberately ignored.
+running=$(docker compose ps --status running --services 2>/dev/null || true)
+
+if ! grep -qx postgres <<< "$running"; then
+    echo "Starting the database services..." >&2
+
+    if ! docker compose up -d --wait postgres; then
+        cat >&2 <<'MESSAGE'
+
+The PostgreSQL service did not come up. The suite cannot be trusted without it,
+so nothing has been run.
+
+To see what went wrong:
+
+    docker compose logs postgres
+
+Once it is up, start it yourself and re-run:
+
+    docker compose up -d --wait postgres
+    composer test
+
+MESSAGE
+        exit 1
+    fi
+fi
+
+exec docker compose run --rm php "$@"
