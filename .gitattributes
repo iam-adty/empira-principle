@@ -6,7 +6,6 @@
 # tests/RoutingTest.php and describes this repository's layout — in someone
 # else's vendor/ directory that path does not exist and the instruction is
 # worse than absent. Contributors still get them from the git checkout.
-/.github        export-ignore
 /.opencode      export-ignore
 /tests          export-ignore
 /.editorconfig  export-ignore

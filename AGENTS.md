@@ -27,12 +27,9 @@ php bin/empira make:component Counter            # generators write to src/compo
 php bin/empira route:list                        # routes an app registers
 ```
 
-`.github/workflows/tests.yml` is written but **not running**: there is no remote,
-and GitHub Actions only executes for a repository hosted on GitHub. It covers
-PHP 8.4 and 8.5 and will start running whenever one is added.
-
-Until then **the test suite is the only gate** — run it before claiming
-something works.
+**The test suite is the only gate** — `composer test` runs it. There is no CI:
+neither repository has a remote, and GitHub Actions only executes for a
+repository hosted on GitHub.
 
 ## Where things live
 

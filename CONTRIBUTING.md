@@ -4,9 +4,8 @@
 > actually does; new code is expected to match.
 
 Thanks for looking. This is a young framework, and the test suite is still the
-gate. A GitHub Actions workflow is written for PHP 8.4 and 8.5, but it does not
-run until this repository has a remote — so please run `composer test` yourself
-before claiming something works.
+gate — there is no CI, so `composer test` before claiming something works. It
+runs the whole suite in Docker; see [Setup](#setup).
 
 ## Setup
 

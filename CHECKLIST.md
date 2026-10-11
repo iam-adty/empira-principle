@@ -104,16 +104,13 @@ header at all**, so a wildcard resolves to HTML. Verified against
 - ~~`.opencode/skills/` (4) + `opencode.json`~~
 
 ### 4. Operations — 2026-10-11
-- [ ] CI — `.github/workflows/tests.yml` is **written in both repositories**
-  (PHP 8.4 and 8.5) but **not running**: there is no remote, and GitHub Actions
-  only executes for a repository hosted on GitHub. Unblocked by the item below.
-- ~~Decided: `.opencode/`, `tests/` and `.github/` are **export-ignored** — the
+- ~~CI — removed; the suite runs locally through Docker (see `docs/testing.md`)~~
+- ~~Decided: `.opencode/` and `tests/` are **export-ignore**d — the
   published package carries `src/`, `docs/`, `bin/` and the markdown docs. The
   skills point at this repository's own `tests/` paths, which do not exist in a
   consumer's `vendor/`; contributors get them from the git checkout~~
-- [ ] Push both repositories to a remote — **blocked: needs the remote URLs from
-  you.** The app's CI also depends on this, since it checks out the framework
-  from `iam-adty/empira-principle` by name
+- [ ] Push both repositories to a remote — no remote is configured; local git only
+  by decision
 
 ### 5. Deferred, by decision
 - ~~`Format::Auto` override on `#[Route]`~~ — **not adding it.** htmx's
