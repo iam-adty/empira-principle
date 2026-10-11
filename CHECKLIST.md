@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **790 framework tests / 1451 assertions**, **24 app tests / 76 assertions**.
+Current: **475 framework tests / 1081 assertions**, **27 app tests / 85 assertions**.
 
 ---
 
