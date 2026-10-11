@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **587 framework tests / 1060 assertions**, **12 app tests / 33 assertions**.
+Current: **616 framework tests / 1117 assertions**, **12 app tests / 33 assertions**.
 
 ---
 
@@ -68,7 +68,7 @@ Current: **587 framework tests / 1060 assertions**, **12 app tests / 33 assertio
 
 In priority order. See [SPEC.md](SPEC.md) for the design behind each.
 
-### 1. Attribute routing `[planned]`
+### 1. Attribute routing `[planned]` — the remaining build
 - [ ] `Attributes/Route.php` — `TARGET_CLASS|TARGET_METHOD|IS_REPEATABLE`
 - [ ] `Routing/RouteRegistrar.php`, `RouteRegistry.php`, `RouteParams.php`
 - [ ] Specificity sort (priority → fewest params → most literal → longest → registration)
@@ -79,25 +79,34 @@ In priority order. See [SPEC.md](SPEC.md) for the design behind each.
 - [ ] Tests: discovery, ordering, repeatable attribute, mount injection
 - [ ] Migrate `app/` to `#[Route]` and delete `app/routes.php`
 
-### 2. JSON / API routes `[planned]`
-- [ ] `Request::accepts()` with q-value parsing (explicit match beats wildcard)
-- [ ] Negotiated format computed once in `handle()`
-- [ ] One error envelope: `{"error": {status, message, errors?}}`
-- [ ] **Fix:** map `ValidationException` to 422 — today it rethrows and fatalises
-- [ ] `VerifyCsrfToken` becomes format-aware
-- [ ] Assert htmx still receives fragments (it sends `Accept: text/html, */*;q=0.9`)
-- [ ] Tests: accept matrix, envelope per status, HTML path unchanged
+### 2. JSON / API routes — 2026-10-11
+- ~~`Request::accepts()` — real q-value parse; explicit mention beats wildcard~~
+- ~~Format negotiated once in `handle()`, readable via `Application::format()`~~
+- ~~One error envelope: `{"error": {status, message, errors?}}`~~
+- ~~**Fixed:** `ValidationException` mapped to 422 — it used to rethrow and fatalise~~
+- ~~`VerifyCsrfToken` format-aware~~
+- ~~29 tests: accept matrix, envelope per status, HTML path byte-identical~~
 
-### 3. Documentation `[building]`
-- [x] `AGENTS.md`, `ARCHITECTURE.md`, `SPEC.md`, this file
-- [ ] `CONTRIBUTING.md`, `CHANGELOG.md`, `SECURITY.md`
-- [ ] `docs/` reference pages
-- [ ] `.opencode/skills/` + `opencode.json`
+htmx is protected by the rule that made it necessary: **htmx sends no `Accept`
+header at all**, so a wildcard resolves to HTML. Verified against
+`htmx.org@2.0.4`, whose intent signal is `overrideMimeType('text/html')`.
+
+### 3. Documentation — 2026-10-11
+- ~~`AGENTS.md`, `ARCHITECTURE.md`, `SPEC.md`, this file~~
+- ~~`CONTRIBUTING.md`, `CHANGELOG.md`, `SECURITY.md`~~
+- ~~`docs/` reference pages — 8, including `json-errors.md`~~
+- ~~`.opencode/skills/` (4) + `opencode.json`~~
 
 ### 4. Operations
 - [ ] CI — no config exists; the test suite is currently the only gate
 - [ ] Push both repositories to a remote
 - [ ] Decide whether `.opencode/` ships in the published package
+
+### 5. Deferred, by decision
+- ~~`Format::Auto` override on `#[Route]`~~ — **not adding it.** htmx's
+  `overrideMimeType` means htmx traffic is permanently HTML, so a route-level
+  force would be a rule with no correct use. `onException()` covers apps that
+  want guaranteed JSON errors.
 
 ---
 

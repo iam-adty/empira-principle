@@ -15,6 +15,14 @@ can change without a major bump, though changes are always documented here.
 
 ### Added
 
+- `Request::accepts()` — a real `Accept` parse with quality values. An explicit
+  mention of a media type beats a wildcard; a missing or wildcard-only header
+  expresses no preference at all.
+- `Http\Format` and `Application::format()` — the format negotiated once per
+  request, injectable from the container.
+- One JSON error envelope, `{"error": {status, message, errors?}}`, for every
+  failure when the client explicitly asks for JSON. HTML is unchanged.
+- `VerifyCsrfToken` now refuses in the negotiated format.
 - Documentation set: `AGENTS.md`, `ARCHITECTURE.md`, `SPEC.md`, `CHECKLIST.md`,
   `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` and a `docs/` reference.
 
@@ -26,6 +34,10 @@ can change without a major bump, though changes are always documented here.
 
 ### Fixed
 
+- **`ValidationException` is mapped in `renderException()`.** It fell through to
+  500 and, not being an `HttpException`, was rethrown — so `throw new
+  ValidationException($bag)` produced an uncaught fatal rather than a 422, despite
+  its own docblock documenting exactly that usage.
 - `Response::html()` silently discarded a second argument, so
   `Response::html('x', 406)` returned a 200.
 - Route group middleware was attached to `Route` but the dispatcher never
@@ -33,6 +45,20 @@ can change without a major bump, though changes are always documented here.
 - `Session` rotated its flash buckets on every access, so a second read in the
   same request discarded the message.
 - `Component::validate()` fired its `invalid` event even when validation passed.
+
+### Note on htmx and `Accept`
+
+htmx sends **no `Accept` header at all** — it signals intent with
+`xhr.overrideMimeType('text/html')`, verified against `htmx.org@2.0.4`. What the
+server actually receives is the browser's XHR default, `*/*`.
+
+Negotiation therefore resolves a wildcard to **HTML**, because that is the header
+every fragment arrives with; treating it as a vote for JSON would break every
+fragment in every application. Two consequences worth knowing:
+
+- JSON has to be asked for explicitly (`Accept: application/json`).
+- Because of `overrideMimeType`, a JSON body handed to an htmx request is
+  *misparsed*, not merely unexpected. No endpoint may serve JSON to htmx.
 
 ### Initial development
 
@@ -88,11 +114,11 @@ working tree. It has not been tagged or published.
 
 True and unfixed at this point:
 
-- `ValidationException` is not mapped in `renderException`; it falls through to
-  500 and is rethrown instead of returning 422. Scheduled in `SPEC.md`.
 - Routing is first-match-wins with no specificity sort, so `/todos/new` must be
   declared before `/todos/{id}`. Scheduled in `SPEC.md`.
-- JSON responses are not negotiated — every page and error is HTML.
+- JSON **errors** are negotiated, but a response is only JSON when a handler
+  returns `Response::json()`. There is no route-level format declaration.
 - No authentication. See `SECURITY.md`.
+- No CSRF exemption for token-authenticated routes.
 - No CI configuration.
 - No git remote; nothing is published anywhere.

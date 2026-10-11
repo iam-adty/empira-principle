@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace IamAdty\Empira;
 
 use IamAdty\Empira\Container\Container;
+use IamAdty\Empira\Html;
+use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware;
 use IamAdty\Empira\Http\Pipeline;
 use IamAdty\Empira\Http\Request;
@@ -16,6 +18,7 @@ use IamAdty\Empira\Routing\UrlGenerator;
 use IamAdty\Empira\Security\Csrf;
 use IamAdty\Empira\State\NullState;
 use IamAdty\Empira\State\StateStore;
+use IamAdty\Empira\Validation\ValidationException;
 
 /**
  * The framework's front door.
@@ -63,6 +66,9 @@ final class Application
     private $errorView = null;
 
     private ?Context $context = null;
+
+    /** The format negotiated for the request in flight. */
+    private ?Format $format = null;
 
     public function __construct(
         string $secret,
@@ -200,9 +206,16 @@ final class Application
         $context = $this->makeContext($request);
         $this->context = $context;
 
+        // Negotiated once, up front: `Request` is immutable, so the format is a
+        // property of this dispatch rather than something mutated onto it later.
+        $this->format = $request->accepts('application/json', ['text/html'])
+            ? Format::Json
+            : Format::Html;
+
         $this->container->instance(Request::class, $request);
         $this->container->instance(Response::class, $context->response);
         $this->container->instance(Context::class, $context);
+        $this->container->instance(Format::class, $this->format);
 
         try {
             return $this->pipeline->send(
@@ -212,6 +225,48 @@ final class Application
         } catch (\Throwable $e) {
             return $this->renderException($e, $request, $context->response);
         }
+    }
+
+    /**
+     * The format negotiated for the request currently being handled.
+     *
+     * HTML unless the client explicitly asked for JSON — see {@see Format}.
+     */
+    public function format(): Format
+    {
+        return $this->format ?? Format::Html;
+    }
+
+    /**
+     * Render an error the way this request's client can read it.
+     *
+     * Every failure leaves through here in one shape: HTML for a browser or
+     * htmx, a JSON envelope for a client that asked for JSON. A client should
+     * never have to parse two different error bodies depending on what went
+     * wrong.
+     */
+    private function errorResponse(int $status, string $message, array $headers = [], ?array $errors = null): Response
+    {
+        $response = new Response();
+
+        foreach ($headers as $name => $value) {
+            $response->withHeader($name, (string) $value);
+        }
+
+        if ($this->format() === Format::Json) {
+            $error = ['status' => $status, 'message' => $message];
+
+            if ($errors !== null && $errors !== []) {
+                $error['errors'] = $errors;
+            }
+
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->setStatus($status)
+                ->setBody(Html::json(['error' => $error]));
+        }
+
+        return $response->setStatus($status)->setBody($message);
     }
 
     /**
@@ -346,14 +401,17 @@ final class Application
         $this->handle($request ?? Request::capture())->send();
     }
 
-    /**
+/**
  * Render a caught exception as a response.
- *
- * Known framework exceptions become their proper status code. Anything else is
- * a genuine bug and is re-thrown unless the application has registered an
- * error handler, so a mistake in a component fails loudly in development
- * instead of being dressed up as a tidy 500 page.
- */
+     *
+     * Known framework exceptions become their proper status code. Anything else is
+     * a genuine bug and is re-thrown unless the application has registered an
+     * error handler, so a mistake in a component fails loudly in development
+     * instead of being dressed up as a tidy 500 page.
+     *
+     * The body is rendered for the format this request negotiated, so a JSON
+     * client gets an envelope and a browser gets a page — from one code path.
+     */
     public function renderException(\Throwable $e, Request $request, Response $response): Response
     {
         if ($this->errorHandler !== null) {
@@ -362,6 +420,7 @@ final class Application
 
         $status = match (true) {
             $e instanceof HttpException => $e->status,
+            $e instanceof ValidationException => $e->status,
             $e instanceof UnknownComponentException => 404,
             $e instanceof InvalidTokenException => 403,
             $e instanceof ForbiddenActionException => 403,
@@ -369,21 +428,25 @@ final class Application
             default => 500,
         };
 
-        if ($status === 500 && !$e instanceof HttpException) {
+        if ($status === 500 && !$e instanceof HttpException && !$e instanceof ValidationException) {
             throw $e;
         }
 
+        $headers = [];
+
         if ($e instanceof MethodNotAllowedException && $e->allow !== []) {
-            $response->withHeader('Allow', implode(', ', $e->allow));
+            $headers['Allow'] = implode(', ', $e->allow);
         }
 
         if ($e instanceof HttpException) {
             foreach ($e->headers as $name => $value) {
-                $response->withHeader($name, (string) $value);
+                $headers[$name] = (string) $value;
             }
         }
 
-        if ($this->errorView !== null) {
+        $errors = $e instanceof ValidationException ? $e->errors()->all() : null;
+
+        if ($this->errorView !== null && $this->format() === Format::Html) {
             $body = ($this->errorView)($status, $e->getMessage());
 
             return $response
@@ -391,7 +454,7 @@ final class Application
                 ->setBody($body instanceof Element ? $body->render() : (string) $body);
         }
 
-        return $response->setStatus($status)->setBody($e->getMessage());
+        return $this->errorResponse($status, $e->getMessage(), $headers, $errors);
     }
 
     /**

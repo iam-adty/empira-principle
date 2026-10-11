@@ -231,7 +231,7 @@ a `routes.php`.
 - abstract and non-instantiable classes skipped
 - `mount()` receives typed params and autowired dependencies
 - explicit `$data` overrides route parameters
-- all 587 existing tests still pass unchanged
+- all 616 existing tests still pass unchanged
 
 ---
 

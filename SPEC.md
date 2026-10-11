@@ -6,7 +6,7 @@
 >
 > Shipped behaviour is in [ARCHITECTURE.md](ARCHITECTURE.md) and `docs/`.
 
-Last reviewed: 2026-10-11. Nothing on this page has been implemented.
+Last reviewed: 2026-10-11. Section 2 shipped; section 1 has not been built.
 
 ---
 
@@ -82,11 +82,13 @@ Plus: `Application::discover()`, `view()` gains parameter merging and `mount()` 
 
 ---
 
-## 2. JSON / API routes `[planned]`
+## 2. JSON / API routes `[shipped]`
 
-### The problem
+### What it solved
 
-`renderException()` produces a plain-text body or an HTML view. There is no JSON error shape, and `Request` does not look at `Accept` at all. A non-browser client gets HTML.
+`renderException()` used to produce a plain-text body or an HTML view. There was no JSON error shape, and `Request` did not look at `Accept` at all, so a non-browser client got HTML.
+
+Shipped as `Request::accepts()`, `Http\Format`, and `Application::errorResponse()`, with coverage in `tests/NegotiationTest.php`.
 
 ### Negotiated, not declared
 
@@ -94,17 +96,29 @@ The route does **not** declare that it serves JSON. The response format is negot
 
 `Request::accepts()` parses real `Accept` headers including `q` values, following the HTTP rule that **an explicit match always beats a wildcard**:
 
-| Client sends | Result |
-|---|---|
-| browser / htmx: `text/html, */*;q=0.9` | HTML |
-| curl: `*/*` | HTML |
-| axios: `application/json, text/plain, */*` | JSON |
-| `text/html, application/json;q=0.9` | HTML (explicit html has the higher q) |
-| `application/json` | JSON |
+| Client sends | Result | Why |
+|---|---|---|
+| **htmx: no `Accept` header at all** | **HTML** | browser XHR default is `*/*` |
+| browser navigation: `text/html,…,*/*;q=0.8` | HTML | explicit `text/html` |
+| curl: `*/*` | HTML | wildcard only |
+| axios: `application/json, text/plain, */*` | JSON | explicit json |
+| `text/html, application/json;q=0.9` | HTML | explicit html has the higher q |
+| `application/json` | JSON | — |
 
-htmx sends `Accept: text/html, */*;q=0.9`, so **fragment behaviour is unaffected**. This must be asserted in the smoke test rather than assumed.
+**htmx never sends an `Accept` header.** Verified against `htmx.org@2.0.4`: the string `accept` does not appear anywhere in its request-building code, and it signals its intent with `xhr.overrideMimeType('text/html')` instead. What therefore arrives is whatever the browser's XHR sends, which is `*/*`.
+
+Two consequences, both load-bearing:
+
+- **`*/*` must resolve to HTML, never JSON.** It is the header every htmx request arrives with. Defaulting it to JSON would break every fragment in every app.
+- **htmx traffic is permanently HTML.** Because of `overrideMimeType('text/html')`, a JSON body handed to an htmx request is misparsed by the client. No endpoint may serve JSON to an htmx caller, and that must be stated rather than discovered.
 
 `Request` is immutable, so the negotiated format is computed once in `handle()` and passed to error rendering — never mutated onto the request.
+
+Negotiation governs the **error** body only. A handler always chooses its own success body, so `Response::json()` works regardless of what the client asked for.
+
+### Constraint: htmx traffic is permanently HTML
+
+Because htmx calls `xhr.overrideMimeType('text/html')`, a JSON body is **misparsed** by the client, not merely unexpected. No endpoint may serve JSON to an htmx caller, and this is not negotiable at the route level — which is one reason no `Format::Auto` override was added. An app that needs guaranteed JSON errors regardless of the client uses `onException()`, which runs before any format decision and returns a full `Response`.
 
 ### One error envelope
 
@@ -116,11 +130,11 @@ Every failure, framework-originated or application-originated, returns the same 
 
 `errors` appears only for validation. One shape means clients parse one thing. When HTML is negotiated, behaviour is byte-identical to today.
 
-### Known bug this fixes `[planned]`
+### Known bug this fixed `[shipped]`
 
-`ValidationException` is **not** mapped in `renderException()`. It falls through to `default => 500`, and because it is not an `HttpException` it is **rethrown** — so a controller that throws it today produces an uncaught fatal rather than a 422, despite its own docblock documenting the 422 usage.
+`ValidationException` was **not** mapped in `renderException()`. It fell through to `default => 500`, and because it was not an `HttpException` it was **rethrown** — a controller that threw it produced an uncaught fatal rather than a 422, despite its own docblock documenting the 422 usage.
 
-This is worth fixing on its own merits, independent of the API work.
+Fixed alongside this work, and worth having had it been independent: it is now mapped, so `throw new ValidationException($bag)` answers 422 with the envelope's `errors` key populated. Covered by `tests/NegotiationTest.php`.
 
 ### Deferred
 

@@ -1,17 +1,12 @@
-# JSON and API routes — planned
+# JSON errors
 
-> ## ⚠️ NOT IMPLEMENTED
->
-> Everything on this page is **design**. The framework returns HTML for pages and
-> text for errors today; there is no JSON negotiation. This page is written to be
-> read *before* building, and corrected against the implementation *after*.
->
-> Source of truth: [../SPEC.md](../SPEC.md) §2.
+> **Status: describes shipped code.** Negotiated errors, one envelope, and the
+> `ValidationException` fix. Source of truth: [../SPEC.md](../SPEC.md) §2.
 
 The goal: a non-browser client gets a JSON body, and one error shape, without the
 route having to declare that it is an API.
 
-## Where it stands today
+## What it replaced
 
 ```php
 public function renderException(\Throwable $e, Request $request, Response $response): Response
@@ -39,18 +34,38 @@ precedence that **an explicit match always beats a wildcard**:
 
 | Client sends | Result | Why |
 |---|---|---|
-| browser: `text/html,application/xhtml+xml,*/*;q=0.8` | HTML | no `application/json` present |
-| htmx: `text/html, */*;q=0.9` | **HTML** | fragment behaviour unchanged |
+| browser: `text/html,application/xhtml+xml,*/*;q=0.8` | HTML | explicit `text/html` |
+| **htmx: nothing** → `*/*` | **HTML** | see below |
 | curl: `*/*` | HTML | wildcard only |
-| axios: `application/json, text/plain, */*` | JSON | explicit json beats wildcard on tie |
+| axios: `application/json, text/plain, */*` | JSON | explicit json |
 | `text/html, application/json;q=0.9` | HTML | explicit html has the higher q |
 | `application/json` | JSON | — |
 
-The fourth row is why substring matching would be wrong.
+**htmx never sends an `Accept` header at all.** This was verified against
+`htmx.org@2.0.4`: the word does not appear in its request-building code. htmx
+signals "I want HTML" with
 
-**htmx sending `Accept: text/html, */*;q=0.9` is load-bearing.** That is what
-keeps every existing fragment response identical. Assert it in the smoke test
-rather than assuming it.
+```js
+xhr.overrideMimeType('text/html')
+```
+
+so what the server receives is the browser's XHR default, `*/*`.
+
+Two rules follow, and both are safety-critical:
+
+1. **`*/*` means HTML.** It is the header every htmx request arrives with. If a
+   wildcard resolved to JSON, every fragment swap in every application would
+   break. The rule is deliberately the conservative one: unchanged behaviour for
+   everyone who has not explicitly asked for JSON.
+2. **htmx traffic is permanently HTML.** `overrideMimeType('text/html')` means a
+   JSON body is *misparsed* by the client, not merely unexpected. No endpoint may
+   serve JSON to an htmx caller.
+
+The second point is why this is worth stating in a design document: it is not
+obvious, and it would otherwise be discovered by shipping something broken.
+
+Accept inspection is **not** a `str_contains` away — real clients send quality
+values, and a substring match gets `application/x-javascript` wrong.
 
 ## Where it is computed
 
@@ -125,11 +140,13 @@ authentication.
 
 ## Deferred
 
-- Any authentication. It plugs into two seams this design already establishes:
-  the negotiated format, and the envelope (`401` in the same shape).
+- Any authentication. It plugs into two seams this establishes: the negotiated
+  format, and the envelope (`401` in the same shape).
+- CSRF exemption for token-authenticated routes — `VerifyCsrfToken` is
+  format-aware but still applies to every unsafe method.
 - CORS, rate limiting, pagination conventions.
 
-## Tests it needs
+## Tests
 
 - the full `Accept` matrix above, including `text/html, application/json;q=0.9`
 - `*/*` with and without a quality value
@@ -141,6 +158,5 @@ authentication.
 
 ---
 
-**This page describes software that does not exist.** When it is built, move the
-behaviour into [http.md](http.md), flip the marker in [../SPEC.md](../SPEC.md),
-and delete this file.
+**See also** [http.md](http.md) for the request/response surface, and
+[../SPEC.md](../SPEC.md) §2 for the reasoning.

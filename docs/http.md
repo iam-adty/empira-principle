@@ -50,8 +50,32 @@ $request->triggerName();       // HX-Trigger-Name
 `isHtmx() && !isBoosted()` is what distinguishes a fragment request from a real
 navigation. That is the check `Layout` uses.
 
-**`Accept` is not currently inspected.** JSON responses and JSON errors are
-[planned](../SPEC.md).
+### Content negotiation
+
+```php
+$request->accepts('application/json', ['text/html']);   // true when JSON is preferred
+```
+
+A real `Accept` parse, not a substring test: quality values are honoured, and an
+explicit mention of a type beats a wildcard. The framework uses it once per
+request to decide how to render **errors** — HTML by default, or a JSON envelope
+when the client explicitly asked for JSON.
+
+| Client sends | Result |
+|---|---|
+| **htmx: nothing** | HTML |
+| **browser XHR / curl: `*/*`** | HTML |
+| browser navigation: `text/html,…` | HTML |
+| `application/json` | JSON |
+| axios: `application/json, text/plain, */*` | JSON |
+| `text/html, application/json;q=0.9` | HTML |
+
+**htmx never sends an `Accept` header at all** — it signals intent with
+`xhr.overrideMimeType('text/html')`. A wildcard therefore carries no preference
+and resolves to HTML, because that is the header every fragment arrives with.
+
+Negotiation governs the **error** body only. A handler always chooses its own
+success body, so `Response::json()` works whatever the client asked for.
 
 ## Response
 
@@ -166,5 +190,5 @@ and skips safe methods (`GET`, `HEAD`, `OPTIONS`, `TRACE`).
 ## Further reading
 
 - [SECURITY.md](../SECURITY.md) — the full security model
-- [docs/planned-api.md](planned-api.md) — JSON negotiation and the error envelope
+- [docs/json-errors.md](json-errors.md) — the error envelope and the Accept matrix
 - [../SPEC.md](../SPEC.md) — planned work
