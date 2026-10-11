@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `731 tests, 1328 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `744 tests, 1372 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -149,6 +149,20 @@ sorted and every ordering test failed at once. Sort into a variable, then use it
 
 **`Container::singleton()` takes a class-string or factory, never an object.** The signature is `callable|string|null`. Pre-built objects go through `instance()`; passing one is a `TypeError`.
 
+**A session outlives the request that opened it.** PHP sessions are
+process-wide. Under php-fpm every request got a fresh process and this never
+surfaced; under a long-running worker, an un-reset `Session` means the second
+visitor reads the first visitor's `$_SESSION` — silently, with nothing in the
+log. `Session::beginRequest()` is what prevents it, and it resets rather than
+replaces: a fresh `Session` per request looks cleaner and is **wrong**, because
+`$app->auth(new SessionGuard($app->session(), …))` captures it at boot and every
+guard then reads a session nothing writes to. See
+[docs/workers.md](docs/workers.md).
+
+**Anything built at boot and held is frozen at whichever request came first.**
+That is what `$app->use(new Middleware(...))` does to a middleware's `Format`
+and `Auth`. Pass the class-string; the pipeline rebuilds it per request.
+
 ### Fixed — do not reintroduce
 
 **`Response::html()` used to discard a second argument.** PHP silently drops extra arguments to a function that does not declare them, so `Response::html('x', 406)` returned a 200. Fixed in `456b960` — it now takes `$status`. Still worth knowing when a status quietly goes missing.
@@ -182,5 +196,6 @@ A change is done when:
 - [docs/data.md](docs/data.md) — connections, dialects, queries, migrations
 - [docs/auth.md](docs/auth.md) — who is asking, and CSRF exemptions
 - [docs/testing.md](docs/testing.md) — fixtures, conventions, the client
+- [docs/workers.md](docs/workers.md) — one boot, many requests, and what is reset
 - [docs/recipes.md](docs/recipes.md) — copy-pasteable how-tos
 - [SPEC.md](SPEC.md) — planned work

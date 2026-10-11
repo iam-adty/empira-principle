@@ -114,6 +114,8 @@ final class Application
         if ($csrf !== null) {
             $this->container->instance(Csrf::class, $csrf);
         }
+
+        $this->container->singleton(Session::class, static fn(Container $container): Session => new Session());
     }
 
     /**
@@ -306,12 +308,13 @@ final class Application
     {
         // An Application outlives the request in a long-running worker, and the
         // session is the one piece of state where that outlives *wrongly* — see
-        // Session::detach(), which is why the reason lives there.
-        Session::detach();
+        // Session::beginRequest(), which is why the reason lives there.
+        $this->container->get(Session::class)->beginRequest();
 
-        // Likewise the connection: one is opened at boot and kept, so its
-        // statement log would otherwise grow for as long as the process lives.
+        // A worker's connection is opened once and kept, so its statement log
+        // would otherwise grow for as long as the process lives.
         $this->db?->connection()->forgetQueries();
+
 
         $context = $this->makeContext($request);
         $this->context = $context;
@@ -335,11 +338,6 @@ final class Application
 
         // Per request, not per application: see auth().
         $this->container->instance(Auth::class, new Auth($this->guards, $request));
-
-        // Per request for the same reason, and it is not enough to reset the
-        // object — the latch inside it decides whether the flash buckets rotate,
-        // and a latched Session is a Session that will never rotate again.
-        $this->container->instance(Session::class, new Session());
 
         try {
             $response = $this->pipeline->send(

@@ -15,6 +15,14 @@ can change without a major bump, though changes are always documented here.
 
 ### Added
 
+- **A `Response::emit()` that does not exit.** `send()` emits and then exits,
+  which is right for a process with nothing else to do and fatal for a
+  long-running worker: FrankenPHP restarts the script, so an `exit` in the
+  request path earns one request per boot and none of the reason to run a
+  worker. See [docs/workers.md](docs/workers.md).
+- **A documented worker-safety contract.** What the framework resets per
+  request, what it deliberately keeps, and the rules for holding new code to
+  it — [docs/workers.md](docs/workers.md).
 - **A component may carry its own stylesheet.** `Component::styles()` is emitted
   inside the component's root element — which is the swap target — so the CSS
   arrives again with every htmx swap. A sheet in `<head>` would be gone the
@@ -97,6 +105,42 @@ can change without a major bump, though changes are always documented here.
   `LogicException` naming the class, rather than a bare `TypeError`.
 
 ### Fixed
+
+- **A session survived the request that opened it, in a long-running worker.**
+  `Session` is a container singleton whose `begun` latch stops its flash buckets
+  rotating more than once — which, in a worker, means never. So `session_start()`
+  ran once per *process*, not per request: the session id stayed bound and
+  `$_SESSION` stayed populated, and every request after the first read and
+  wrote the first visitor's data. `regenerate()` defended the wrong id, so the
+  fixation defence protected a session nobody was using. It is a cross-user data
+  leak, silent, with no error and nothing in the log — and php-fpm hid it,
+  because every request got a fresh process.
+
+  `Session::beginRequest()` now closes the session and clears the latch before
+  each dispatch. The fix is deliberately a *reset* rather than a fresh instance
+  per request: `$app->auth(new SessionGuard($app->session(), …))` captures the
+  session at boot, so replacing the instance per request would leave every guard
+  reading a session nothing ever writes to. `WorkerTest` drives two requests
+  through one `Application`; five of its tests fail without this.
+- **A context outlived its request.** `Application::$context` was replaced per
+  dispatch but never cleared, so a `view()` called between requests mutated the
+  `Response` object that request had already been sent.
+- **`$app->use()` could freeze a middleware's view of the world.** An instance
+  passed to `use()` is built at boot and reused unchanged, so under a worker it
+  keeps the `Format` and `Auth` of whichever request ran first — a JSON client
+  answered with an HTML page, or a session-authenticated POST exempted from CSRF
+  on the strength of another request's bearer token. `use()` now says to pass the
+  class-string, which the pipeline rebuilds per request.
+- **A worker's statement log grew without bound.** `Connection` is opened once
+  and kept, so `queries()` was every statement the process had ever run. It is
+  cleared between requests.
+
+  Two hazards an audit raised did not survive checking and were not "fixed",
+  because there is nothing to fix: raw transaction control is not exposed
+  anywhere — `Connection::transaction()` wraps begin/commit/rollback in
+  try/catch, so no request can leave one open for the next — and the three
+  static caches (`PropBag`, `ActionMap`, `ElementFactory`) are keyed by class
+  name or immutable, so they cannot grow per request.
 
 - **`self::OPEN` in `AbstractGrammar` bound to the base class**, so every
   dialect emitted backticks and PostgreSQL would have rejected them. Only a live

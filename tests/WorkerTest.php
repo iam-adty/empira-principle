@@ -57,7 +57,7 @@ final class WorkerTest extends TestCase
 
     // ------------------------------------------------------------- sessions
 
-    public function testEachRequestGetsItsOwnSessionInstance(): void
+    public function testOneSessionServesEveryRequestAndIsResetBetweenThem(): void
     {
         $app = $this->app();
 
@@ -67,9 +67,12 @@ final class WorkerTest extends TestCase
         $app->handle(new Request('GET', '/'));
         $second = $this->session($app);
 
-        // A shared Session would carry its `begun` latch across the boundary, and
-        // the latch is what stops the flash buckets ever rotating again.
-        self::assertNotSame($first, $second);
+        // Deliberately the *same* object. `$app->auth(new SessionGuard($app->session(), …))`
+        // captures the Session at boot, so a fresh one per request would leave
+        // every guard reading a session nothing ever writes to. The instance is
+        // shared; what has to be reset is its state, and `beginRequest()` is what
+        // does that.
+        self::assertSame($first, $second);
     }
 
     public function testAValueWrittenInOneRequestIsReadableInTheNext(): void
@@ -87,11 +90,11 @@ final class WorkerTest extends TestCase
         self::assertSame(7, $this->session($app)->get('user_id'));
     }
 
-    public function testDetachIsANoOpUnderTheCli(): void
+    public function testBeginRequestIsANoOpUnderTheCli(): void
     {
         $_SESSION = ['empira' => ['user_id' => 7]];
 
-        Session::detach();
+        (new Session())->beginRequest();
 
         // The CLI has no session to close. Detaching there would throw away the
         // very state that stands in for one.

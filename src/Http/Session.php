@@ -119,7 +119,7 @@ final class Session implements SessionId
     }
 
     /**
-     * Release the PHP session so the next request in this process opens its own.
+     * Prepare this session to serve another request.
      *
      * A session is process-wide, and a long-running worker outlives the request
      * that opened one. PHP does not follow the request boundary for you: the
@@ -128,15 +128,22 @@ final class Session implements SessionId
      * defends the wrong id. Closing costs one write to the session store and is
      * the only thing between a worker and a cross-user data leak.
      *
-     * A no-op under the CLI, where there is nothing to close: `$_SESSION` is an
-     * in-process array standing in for a session, and a test driving two
-     * requests through one Application is relying on it surviving between them.
-     * That is also why `begin()` only ever rotates the flash buckets once per
-     * instance — under a worker the instance is per request, because
-     * `Application::handle()` binds a new one.
+     * The latch is cleared for the same reason. It stops the flash buckets
+     * rotating more than once in a request, because rotating twice would throw
+     * away a message this request had promoted but not yet read. Left set, it
+     * would stop them rotating *ever* — one flash on the first request of a
+     * worker's life, and silence for the rest of it.
+     *
+     * Called by `Application::handle()` before every dispatch, so it cannot be
+     * the thing somebody forgets.
      */
-    public static function detach(): void
+    public function beginRequest(): void
     {
+        $this->begun = false;
+
+        // Under the CLI there is no session to close: `$_SESSION` is an in-process
+        // array standing in for one, and a test driving two requests through one
+        // Application is relying on it surviving between them.
         if (PHP_SAPI === 'cli') {
             return;
         }
