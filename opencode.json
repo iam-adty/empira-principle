@@ -1,0 +1,25 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "instructions": [
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "docs/components.md",
+        "docs/routing.md",
+        "docs/views.md",
+        "docs/http.md",
+        "docs/testing.md",
+        "docs/recipes.md"
+    ],
+    "permission": {
+        "bash": {
+            "*": "ask",
+            "composer test": "allow",
+            "vendor/bin/phpunit*": "allow",
+            "php -l *": "allow",
+            "php bin/empira *": "allow",
+            "git status*": "allow",
+            "git diff*": "allow",
+            "git log*": "allow"
+        }
+    }
+}
