@@ -9,6 +9,7 @@ use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware\VerifyCsrfToken;
 use IamAdty\Empira\Http\Request;
 use IamAdty\Empira\Http\Response;
+use IamAdty\Empira\Routing\HttpException;
 use IamAdty\Empira\Security\Csrf;
 use IamAdty\Empira\State\NullState;
 use IamAdty\Empira\Validation\ValidationException;
@@ -191,6 +192,25 @@ final class NegotiationTest extends TestCase
         $this->assertSame(422, $response->status());
         $this->assertSame('Validation failed for: title.', $response->body());
         $this->assertArrayNotHasKey('Content-Type', $response->headers());
+    }
+
+    public function testAnErrorViewKeepsTheHeadersTheExceptionCarried(): void
+    {
+        // An error view chooses the body. It does not get to change what the
+        // response *means* — and the headers on an HttpException are protocol,
+        // not decoration: `Allow` on a 405 and `Retry-After` on a 429 are how a
+        // client knows what to do next. They were assembled and then dropped.
+        $app = new Application('a-secret-that-is-long-enough', new NullState());
+        $app->onHttpError(static fn(int $status, string $message): string => '<h1>' . $status . '</h1>');
+        $app->fallback(static function (): string {
+            throw new HttpException(429, 'Too many attempts.', ['Retry-After' => '900']);
+        });
+
+        $response = $app->handle(new Request('GET', '/boom'));
+
+        $this->assertSame(429, $response->status());
+        $this->assertSame('<h1>429</h1>', $response->body());
+        $this->assertSame('900', $response->headers()['Retry-After']);
     }
 
     public function testAnHtmlErrorViewStillRendersForBrowsers(): void

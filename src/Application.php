@@ -881,6 +881,15 @@ final class Application
         if ($this->errorView !== null && $this->format() === Format::Html) {
             $body = ($this->errorView)($status, $e->getMessage());
 
+            // The headers are applied here too. An error view chooses the *body*
+            //; it has no business changing what the response means, and
+            // dropping these silently costs a 405 its `Allow` and a 429 its
+            // `Retry-After` — both of which are part of the protocol rather than
+            // decoration on it.
+            foreach ($headers as $name => $value) {
+                $response->withHeader($name, $value);
+            }
+
             return $response
                 ->setStatus($status)
                 ->setBody($body instanceof Element ? $body->render() : (string) $body);
