@@ -34,6 +34,17 @@ final class Application
     /** @var array<string, Command> */
     private array $commands;
 
+    /**
+     * Commands the project registered, kept apart from the framework's own.
+     *
+     * Separate so that `list` can say where a command came from — a name in the
+     * left-hand column that somebody spent an afternoon on deserves to be
+     * recognisable as theirs.
+     *
+     * @var array<string, Command>
+     */
+    private array $project = [];
+
     public function __construct()
     {
         $this->commands = [
@@ -52,7 +63,32 @@ final class Application
      */
     public function commands(): array
     {
-        return $this->commands;
+        return $this->commands + $this->project;
+    }
+
+    /**
+     * Add a command the project supplies itself.
+     *
+     * The framework cannot know what an application's seeders look like, so
+     * `empira seed` is registered by the application that owns it. A project
+     * command cannot take the name of a framework one: two commands called
+     * `migrate`, where the winner depends on which was registered last, is
+     * exactly the kind of surprise a console should not have.
+     *
+     * @throws \InvalidArgumentException when the name is already the framework's
+     */
+    public function project(string $name, Command $command): self
+    {
+        if (isset($this->commands[$name])) {
+            throw new \InvalidArgumentException(sprintf(
+                'The framework already provides "%s"; a project command cannot take that name.',
+                $name
+            ));
+        }
+
+        $this->project[$name] = $command;
+
+        return $this;
     }
 
     /**
@@ -75,14 +111,19 @@ final class Application
             return 0;
         }
 
-        if (!isset($this->commands[$command])) {
+        // commands(), not $this->commands: the project may have registered one
+        // under this name, and a command that is listed but not dispatchable is
+        // worse than one that is absent.
+        $commands = $this->commands();
+
+        if (!isset($commands[$command])) {
             $output->error(sprintf('Unknown command "%s".', $command));
             $this->writeListing($output);
 
             return 1;
         }
 
-        return $this->commands[$command]->handle(self::options($arguments), $output);
+        return $commands[$command]->handle(self::options($arguments), $output);
     }
 
     /**
@@ -128,7 +169,9 @@ final class Application
      */
     private function writeListing(Output $output): void
     {
-        $names = array_keys($this->commands);
+        $all = $this->commands();
+
+        $names = array_keys($all);
         sort($names);
 
         $width = 0;
@@ -151,9 +194,14 @@ final class Application
         $output->line('Commands:');
 
         foreach ($names as $name) {
-            $command = $this->commands[$name];
+            $command = $all[$name];
 
-            $output->line(sprintf('  %-' . $width . 's  %s', $name, $command->description()));
+            // Project commands are marked, so the distinction between "the
+            // framework has this" and "this application wrote it" is visible
+            // without having to go and look.
+            $source = isset($this->project[$name]) ? '  (project)' : '';
+
+            $output->line(sprintf('  %-' . $width . 's  %s%s', $name, $command->description(), $source));
 
             if ($command->arguments() !== []) {
                 $output->line(sprintf(

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `787 tests, 1423 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `802 tests, 1461 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -65,11 +65,11 @@ printed. That check is why `composer test` means what it says — read
 | `src/Container/` | Autowiring service container |
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
 | `src/Data/` | `Connection`, `Query`, `Db`, `Grammar` + dialects, `Migrator`, `ConnectionFactory` |
-| `src/Config/` | `.env` parsing, dot-notation config |
+| `src/Config/` | `.env` parsing, dot-notation config, `DatabaseConfig` (the one reader for `DB_*`) |
 | `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth` |
 | `src/Security/Csrf.php` | Session-backed CSRF for component actions |
 | `src/Testing/` | `TestClient`, `TestResponse` |
-| `src/Console/` | CLI kernel and commands |
+| `src/Console/` | CLI kernel, commands, and `Bootstrap` (finding a project's own commands) |
 
 Logging has no directory of its own: the framework asks for a `Psr\Log\LoggerInterface` and supplies none unless the application hands one over with `$app->log()`. `Psr\Log\NullLogger` is the default, so a framework that logs by surprise never happens.
 
@@ -181,6 +181,32 @@ That is what `$app->use(new Middleware(...))` does to a middleware's `Format`
 and `Auth`. Pass the class-string; the pipeline rebuilds it per request.
 
 ### Fixed — do not reintroduce
+
+**`empira migrate` migrated a database nobody could see.** The command read
+`DB_*` through a copy of the application's configuration, and the copy had
+*different defaults* — `:memory:` and host `127.0.0.1`. Run without those
+variables set, it migrated a throwaway SQLite that vanished on exit while the
+application sat on a real database, and it printed `migrated` either way. There
+is now one reader, `Config\DatabaseConfig`, used by both. The habit: **a command
+and a runtime must never each read the environment independently.**
+
+**A Doctrine collection that is `Countable` but not `IteratorAggregate`
+silently yields nothing in a `foreach`.** `AvailableMigrationsSet` is one, so
+`migrate --status` reported `none` while a migration had demonstrably just run —
+`count()` said 1, the `foreach` produced nothing, and both were correct
+expressions of the object. Always `->getItems()`. More generally: **when a
+collection yields nothing, check the count before believing it.**
+
+**A migration file with no `namespace` statement is invisible.** Doctrine globs
+`Version*.php`, `require_once`s it, and keeps only classes inside the namespace
+the command registered. A file missing the namespace is found, read, and thrown
+away, so `migrate` says "Nothing to migrate" with no error anywhere. The
+namespace and the `Version` prefix are both load-bearing.
+
+**Migration classes cannot be reused across fixtures in one run.** Doctrine
+`require_once`s them, so two tests declaring `Version20260101000001` is a fatal
+redeclaration mid-run, not a failed assertion. Fixture version numbers come from
+a counter.
 
 **The suite could report success having run almost nothing.** PHPUnit picks its exit status in `ShellExitCodeCalculator`, which nothing reaches if the process exits first — so an `exit` anywhere in the code under test truncated the run, printed no summary, and returned **0**. Measured: a fixture with an `exit` in it stopped the suite after 21 tests and `composer test` still succeeded.
 

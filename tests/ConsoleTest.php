@@ -171,38 +171,10 @@ final class ConsoleTest extends TestCase
         $this->assertStringContainsString('namespace Blog\Http;', $contents);
     }
 
-    public function testMigrateRunsAMigrationsDirectory(): void
-    {
-        $target = $this->tempdir();
-        mkdir($target . '/migrations', 0o777, true);
-
-        file_put_contents($target . '/migrations/2026_10_11_000001_widgets.php', <<<'PHP'
-            <?php
-
-            declare(strict_types=1);
-
-            use IamAdty\Empira\Data\Connection;
-            use IamAdty\Empira\Data\Migration;
-
-            return new class implements Migration
-            {
-                public function up(Connection $c): void
-                {
-                    $c->execute('CREATE TABLE widgets (id INTEGER PRIMARY KEY)');
-                }
-
-                public function down(Connection $c): void
-                {
-                    $c->execute('DROP TABLE widgets');
-                }
-            };
-            PHP);
-
-        $result = $this->console(['empira', 'migrate', '--target=' . $target]);
-
-        $this->assertSame(0, $result['code']);
-        $this->assertStringContainsString('2026_10_11_000001_widgets', $result['output']);
-    }
+    // `empira migrate` moving a real directory is covered by MigrationsTest,
+    // which runs it against an actual database — asserting only that a name
+    // appeared in the output would pass just as well against a migration that
+    // went to the wrong database and reported success anyway.
 
     public function testMigrateSaysSoWhenThereIsNoMigrationsDirectory(): void
     {

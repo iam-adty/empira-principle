@@ -89,6 +89,9 @@ final class Application
     /** @var list<\IamAdty\Empira\Auth\Guard> */
     private array $guards = [];
 
+    /** @var array<string, \IamAdty\Empira\Console\Command> commands the application supplied */
+    private array $commands = [];
+
     /** Where anything the framework has to record goes. Discards, unless told otherwise. */
     private LoggerInterface $logger;
 
@@ -159,6 +162,44 @@ final class Application
     public function guards(): array
     {
         return $this->guards;
+    }
+
+    /**
+     * Add a command this application supplies.
+     *
+     * The framework cannot know what an application's seeders or importers look
+     * like, so `empira seed` is written by the application that owns it and
+     * registered here. Registering it at boot is what lets `bin/empira` find
+     * it: the console boots the project, asks the {@see Application} what
+     * commands it has, and adds them to the listing.
+     *
+     *     $app->command('seed', new Seed($app->container()->get(UserRepository::class)));
+     *
+     * @throws \InvalidArgumentException when the name is already registered
+     */
+    public function command(string $name, \IamAdty\Empira\Console\Command $command): self
+    {
+        if (isset($this->commands[$name])) {
+            throw new \InvalidArgumentException(sprintf(
+                'A command called "%s" is already registered.',
+                $name
+            ));
+        }
+
+        $this->commands[$name] = $command;
+
+        return $this;
+    }
+
+    /**
+     * The commands this application registered, keyed by the name each is
+     * invoked with.
+     *
+     * @return array<string, \IamAdty\Empira\Console\Command>
+     */
+    public function commands(): array
+    {
+        return $this->commands;
     }
 
     /**

@@ -290,6 +290,54 @@ recorded at all, because a client making a mistake is not an incident.
 
 ---
 
+## Add a console command
+
+The framework's commands are its own. Yours go in the application, which
+registers them during boot:
+
+```php
+// src/Console/Seed.php
+final class Seed implements \IamAdty\Empira\Console\Command
+{
+    public function __construct(private readonly UserRepository $users) {}
+
+    public function name(): string { return 'seed'; }
+    public function description(): string { return 'Put the demo account in.'; }
+    public function arguments(): array { return ['[--email=address]']; }
+
+    public function handle(array $options, Output $output): int
+    {
+        $this->users->seed((string) ($options['email'] ?? 'ada@example.com'));
+        $output->line('  seeded');
+
+        return 0;
+    }
+}
+```
+
+```php
+$app->command('seed', new Seed($app->container()->get(UserRepository::class)));
+```
+
+For the console to find that, it needs a bootstrap it can run:
+
+```php
+// bootstrap/app.php
+require __DIR__ . '/../vendor/autoload.php';
+
+return App::boot();
+```
+
+`bin/empira` looks for `bootstrap/app.php` in the working directory, or wherever
+`EMPIRA_BOOTSTRAP` points. It is **optional** — `make:component` and `route:list`
+work in a checkout with no application at all.
+
+Project commands are marked `(project)` in `list`, and cannot take the name of a
+framework command. Two `migrate`s where the winner depends on registration order
+is not a surprise a console should have.
+
+---
+
 ## Verify before you commit
 
 ```bash

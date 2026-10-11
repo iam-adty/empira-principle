@@ -141,36 +141,71 @@ something to smuggle in.
 
 ```bash
 php bin/empira migrate --target=path/to/app
+php bin/empira migrate --target=path/to/app --status
 php bin/empira migrate --target=path/to/app --step=down
 ```
 
-Files live in `migrations/`, are named for when they happened, and return a
-`Migration`:
+Migrations run through [Doctrine Migrations](https://www.doctrine-project.org/projects/migrations.html).
+Files live in `migrations/`, are named `Version<when>`, and extend
+`AbstractMigration`:
 
 ```php
-// migrations/2026_10_11_000001_create_users_table.php
-return new class implements Migration {
-    public function up(Connection $connection): void
+// migrations/Version20261011000001.php
+namespace Empira\Migrations;
+
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
+
+final class Version20261011000001 extends AbstractMigration
+{
+    public function up(Schema $schema): void
     {
-        $connection->execute('CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)');
+        $users = $schema->createTable('users');
+        $users->addColumn('id', 'integer', ['autoincrement' => true]);
+        $users->setPrimaryKey(['id']);
+        $users->addColumn('email', 'string', ['length' => 255]);
     }
 
-    public function down(Connection $connection): void
+    public function down(Schema $schema): void
     {
-        $connection->execute('DROP TABLE users');
+        $schema->dropTable('users');
     }
-};
+}
 ```
 
-A migration is recorded only after it succeeds, so a failure is retried rather
-than skipped past — a ledger that claims a migration ran when it did not is how
-a schema ends up disagreeing with itself.
+Three things the namespace and the name are not decoration. Doctrine globs
+`Version*.php`, and it only collects a class that lives in the namespace the
+command registered — a file with no `namespace` statement is silently invisible,
+and `migrate` reports "Nothing to migrate" with no explanation.
 
-Migrations are **SQL**, so they are dialect-specific. There is no portable
-spelling for an auto-incrementing column: SQLite wants `AUTOINCREMENT` and
-PostgreSQL wants `SERIAL`, and a migration that must run on both branches on
-`$connection->grammar()->driver()`. That friction is the clearest argument for
-a schema builder later, and the main reason there is not one now.
+**Migrations are a deploy step, not something that happens on boot.** Under a
+worker, boot runs once per thread, so a boot that migrates has every thread
+racing through the same migration. Run them where a deploy runs them.
+
+The version ledger is Doctrine's, in a `migrations` table it creates itself.
+`--step=down` undoes exactly the most recent migration rather than the whole
+history: a mistake should cost one migration, not all of them.
+
+Describing the column instead of writing the SQL removes the dialect branch
+this section used to warn about. There is no portable spelling for an
+auto-incrementing column in raw SQL — SQLite wants `AUTOINCREMENT` and
+PostgreSQL wants `SERIAL` — but `['autoincrement' => true]` means the same thing
+in both, and the platform decides.
+
+## Where the database connection comes from
+
+One reader, `DatabaseConfig`, used by both the application and the console:
+
+```php
+$config = DatabaseConfig::fromEnvironment();          // reads DB_*
+$connection = DatabaseConfig::connection($config);    // a DBAL connection
+```
+
+This used to be two readers with different defaults, and the difference was a
+trap: `empira migrate` with no `DB_*` set migrated an in-memory SQLite that
+vanished on exit, while the application sat on a real database. It printed
+"migrated" either way. A command and a request cannot disagree about which
+database they mean, because neither of them decides.
 
 ## Transactions
 
