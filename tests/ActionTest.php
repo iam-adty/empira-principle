@@ -6,10 +6,12 @@ namespace IamAdty\Empira\Tests;
 
 use IamAdty\Empira\Application;
 use IamAdty\Empira\Attributes\Verb;
-use IamAdty\Empira\ForbiddenActionException;
+use IamAdty\Empira\Container\ContainerException;
 use IamAdty\Empira\Http\Request;
 use IamAdty\Empira\State\NullState;
 use IamAdty\Empira\Tests\Fixtures\ActionOverrideFixture;
+use IamAdty\Empira\Tests\Fixtures\Clock;
+use IamAdty\Empira\Tests\Fixtures\ClockFixture;
 use IamAdty\Empira\Tests\Fixtures\MixedActionsFixture;
 use IamAdty\Empira\Tests\Fixtures\UnsafeAttributeFixture;
 use IamAdty\Empira\Tests\Fixtures\VerbsFixture;
@@ -67,6 +69,65 @@ final class ActionTest extends TestCase
         preg_match_all('/hx-(get|post|put|patch|delete)="/', $html, $matches);
 
         return array_values(array_unique($matches[1] ?? []));
+    }
+
+    // ---------------------------------------------------------------- injection
+
+    public function testAnActionReceivesWhatItAsksForByType(): void
+    {
+        $app = $this->app();
+        $app->container()->instance(Clock::class, new Clock('morning'));
+        $app->registry()->alias('clock', ClockFixture::class);
+
+        $html = (string) $app->render(ClockFixture::class)->render();
+        $url = $this->urlFor($html, 'post', 'greet');
+
+        $response = $app->handle(new Request('POST', $url, headers: ['HX-Request' => 'true']));
+
+        // The action asked for a service by type and was handed one, rather than
+        // reaching into the container itself or taking it as a prop.
+        $this->assertSame(200, $response->status());
+        $this->assertStringContainsString('morning', $response->body());
+    }
+
+    public function testAnActionThatAsksForNothingIsUnaffected(): void
+    {
+        $app = $this->app();
+
+        $html = (string) $app->render(VerbsFixture::class)->render();
+        $url = $this->urlFor($html, 'post', 'create');
+
+        $this->assertSame(200, $app->handle(new Request('POST', $url, headers: ['HX-Request' => 'true']))->status());
+    }
+
+    public function testAnUnresolvableParameterIsRefusedRatherThanIgnored(): void
+    {
+        $app = $this->app();
+        $app->registry()->alias('clock', ClockFixture::class);
+
+        $html = (string) $app->render(ClockFixture::class)->render();
+        $url = $this->urlFor($html, 'post', 'speak');
+
+        // Nothing is bound to Greeter, so the container cannot build one. Saying
+        // so beats calling the action with an argument silently missing.
+        $this->expectException(ContainerException::class);
+        $this->expectExceptionMessage('$greeter');
+
+        $app->handle(new Request('POST', $url, headers: ['HX-Request' => 'true']));
+    }
+
+    public function testInjectionDoesNotWidenWhatMayBeInvoked(): void
+    {
+        $app = $this->app();
+        $app->registry()->alias('clock', ClockFixture::class);
+
+        $html = (string) $app->render(ClockFixture::class)->render();
+        $url = str_replace('/greet', '/undeclared', $this->urlFor($html, 'post', 'greet'));
+
+        // The token still only names the component, and the action map still
+        // decides what may be called. Autowiring changed what a declared action
+        // is handed, not what can be reached — a refused action is still a 403.
+        $this->assertSame(403, $app->handle(new Request('POST', $url, headers: ['HX-Request' => 'true']))->status());
     }
 
     // ---------------------------------------------------------------- generated markup

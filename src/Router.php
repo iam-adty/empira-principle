@@ -78,12 +78,34 @@ final class Router
         $action = $match['action'];
 
         $component->beforeAction($action);
-        $component->{$action}();
+        $this->invoke($context, $component, $action);
         $component->afterAction($action);
 
         return $context->response
             ->setStatus(200)
             ->setBody($component->toHtml());
+    }
+
+    /**
+     * Call a declared action with its parameters resolved by type.
+     *
+     * An action is a method like any other, so it takes what it needs the way a
+     * controller does — `login(Auth $auth, UserRepository $users)` — rather
+     * than reaching into the container itself. An action that asks for nothing
+     * is unaffected: there is simply nothing to resolve.
+     *
+     * Note the action's **return value is discarded**; a component responds by
+     * mutating its props and the response, which is what the swap is built from.
+     */
+    private function invoke(Context $context, Component $component, string $action): void
+    {
+        if ($context->container === null) {
+            $component->{$action}();
+
+            return;
+        }
+
+        $context->container->call([$component, $action]);
     }
 
     /**

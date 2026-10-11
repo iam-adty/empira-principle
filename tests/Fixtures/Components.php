@@ -448,3 +448,57 @@ final class UnsafeAttributeFixture extends Component
         return $this->hx->div();
     }
 }
+
+/**
+ * A value that exists only so an action has something to ask the container for.
+ */
+final readonly class Clock
+{
+    public function __construct(public string $partOfDay = 'day')
+    {
+    }
+}
+
+/**
+ * Something with no implementation and no binding, so it cannot be built.
+ */
+interface Greeter
+{
+    public function greeting(): string;
+}
+
+/**
+ * An action that takes a service as a parameter.
+ *
+ * Every other fixture keeps its actions parameterless, so this is the one that
+ * would notice if actions stopped being autowired.
+ */
+final class ClockFixture extends \IamAdty\Empira\Component
+{
+    #[\IamAdty\Empira\Attributes\Post]
+    public function greet(Clock $clock): void
+    {
+        $this->with('greeting', 'good ' . $clock->partOfDay);
+    }
+
+    /**
+     * Asks for something the container cannot build.
+     *
+     * An interface with no binding, so this is the one action guaranteed to be
+     * unresolvable — which is what makes the loud-failure assertion possible.
+     */
+    #[\IamAdty\Empira\Attributes\Post]
+    public function speak(Greeter $greeter): void
+    {
+        $this->with('greeting', $greeter->greeting());
+    }
+
+    protected function render(): \IamAdty\Empira\Element
+    {
+        return $this->hx->div()
+            ->id($this->id())
+            ->append($this->hx->p()->text($this->stringProp('greeting', 'unset')))
+            ->append($this->hx->button()->text('greet')->action('greet'))
+            ->append($this->hx->button()->text('speak')->action('speak'));
+    }
+}

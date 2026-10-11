@@ -364,7 +364,20 @@ abstract class Component
         return $this->id() . ':' . $event;
     }
 
-    private function container(): Container
+    /**
+     * The application's container, so a component can reach a service.
+     *
+     * Protected rather than private because an action receives what it needs
+     * by type, but `render()` is called internally and has no arguments — so
+     * this is how a component reads `Auth`, a repository or configuration
+     * while it is rendering. Without it, everything a component can depend on
+     * has to be passed in as a prop, which is not a prop's job.
+     *
+     * Resolving through the container never widens what may be *invoked*: the
+     * router refuses an undeclared action before it calls one. This only
+     * decides what a declared action is handed.
+     */
+    protected function container(): Container
     {
         return $this->context->container ?? new Container();
     }
