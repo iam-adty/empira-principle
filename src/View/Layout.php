@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace IamAdty\Empira\View;
 
-use Closure;
 use IamAdty\Empira\Application;
 use IamAdty\Empira\Element;
 use IamAdty\Empira\ElementFactory;

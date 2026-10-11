@@ -12,7 +12,6 @@ use IamAdty\Empira\Auth\SessionGuard;
 use IamAdty\Empira\Auth\User;
 use IamAdty\Empira\Auth\UserProvider;
 use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware\VerifyCsrfToken;
 use IamAdty\Empira\Http\Request;
 use IamAdty\Empira\Http\Response;

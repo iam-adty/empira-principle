@@ -6,7 +6,6 @@ namespace IamAdty\Empira\Http\Middleware;
 
 use Closure;
 use IamAdty\Empira\Auth\Auth;
-use IamAdty\Empira\Auth\BearerGuard;
 use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware;
 use IamAdty\Empira\Http\Request;

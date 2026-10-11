@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace IamAdty\Empira\Tests;
 
 use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Config\Env;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigTest extends TestCase

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace IamAdty\Empira\Tests;
 
 use IamAdty\Empira\Application;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\ElementFactory;
 use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware\VerifyCsrfToken;
 use IamAdty\Empira\Http\Request;

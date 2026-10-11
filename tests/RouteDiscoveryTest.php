@@ -6,14 +6,10 @@ namespace IamAdty\Empira\Tests;
 
 use IamAdty\Empira\Application;
 use IamAdty\Empira\Attributes\Route;
-use IamAdty\Empira\Element;
 use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Raw;
 use IamAdty\Empira\Routing\Controller;
-use IamAdty\Empira\Routing\HttpException;
 use IamAdty\Empira\Routing\RouteCollection;
 use IamAdty\Empira\Routing\RouteParams;
-use IamAdty\Empira\Routing\RouteRegistrar;
 use IamAdty\Empira\State\NullState;
 use IamAdty\Empira\View\Layout;
 use IamAdty\Empira\View\Region;
