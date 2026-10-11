@@ -178,7 +178,27 @@ abstract class Layout
             ->append($this->hx->meta()->attr('name', 'viewport')->attr('content', 'width=device-width, initial-scale=1'))
             ->append($this->hx->title($this->title()))
             ->append($this->hx->script()->attr('src', $this->htmxUrl())->attr('defer', true))
-            ->append($this->styles());
+            ->append($this->styleElement($this->styles()));
+    }
+
+    /**
+     * Put the page's styling inside a `<style>` element.
+     *
+     * A stylesheet returned as {@see Raw} is a stylesheet, not markup: wrapping
+     * it is what stops a bare string of CSS landing in `<head>` as text a
+     * browser will hoist away and discard. An {@see Element} is taken as-is, so
+     * an app that wants a `<link rel="stylesheet">` — or two separate `<style>`
+     * blocks — can still say so.
+     */
+    private function styleElement(Element|Raw $styles): Element|Raw|null
+    {
+        if ($styles instanceof Element) {
+            return $styles;
+        }
+
+        $css = $styles->get();
+
+        return $css === '' ? null : $this->hx->style()->raw($css);
     }
 
     /**
@@ -208,7 +228,12 @@ abstract class Layout
     }
 
     /**
-     * Page styling. Override to ship your own.
+     * Page styling.
+     *
+     * Return the stylesheet as {@see Raw} — the text is wrapped in `<style>`
+     * for you — or return an {@see Element} if you would rather emit the tag
+     * yourself, as with a `<link rel="stylesheet">`. Returning an empty string
+     * or a `Raw` of one emits no `<style>` at all.
      */
     protected function styles(): Element|Raw
     {
