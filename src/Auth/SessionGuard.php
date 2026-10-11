@@ -57,7 +57,7 @@ final class SessionGuard implements Guard
     {
         ($this->rotator ?? $this->session)->regenerate();
 
-        $this->session->put($this->key, $user->id);
+        $this->session->put($this->key, $user->id());
     }
 
     public function logout(): void

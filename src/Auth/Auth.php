@@ -111,7 +111,7 @@ final class Auth
 
     public function id(): int|string|null
     {
-        return $this->user()?->id;
+        return $this->user()?->id();
     }
 
     /**

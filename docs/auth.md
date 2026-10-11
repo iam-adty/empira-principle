@@ -100,7 +100,7 @@ containing the credential puts it in a log file.
 ## Users
 
 ```php
-$users = new DatabaseUserProvider($db);            // a users table
+$users = new DoctrineUserProvider($app->entities());  // the ORM
 
 $user = $users->byId(7);
 $user = $users->byCredential('ada@example.com');
@@ -112,13 +112,32 @@ $users->hash('correct horse');                     // to store one
 between a password and a secure hash. A user with no stored hash fails to
 authenticate — a missing column must not read as "any password works".
 
-The hash never leaves the provider: `User` is built with `password_hash`
-removed, so a controller cannot log it by accident.
+The hash is reachable only through `passwordHash()`, which a view never calls:
+the properties are not public, so an exception carrying a user cannot serialise
+one by accident.
 
-**`UserProvider` is the ORM seam.** A `SessionGuard` sits on a database
-provider today and would sit on an Eloquent one tomorrow without auth noticing,
-because both answer the same two methods and nothing else knows how a user is
-found.
+**`User` is an entity.** That is the change, and it has consequences worth
+stating rather than discovering:
+
+```php
+$user->id();          // was $user->id — the id is assigned by the ORM
+$user->email();
+$user->name();
+```
+
+- **A `User` that came from a guard is *managed*.** It belongs to an
+  EntityManager. A lazy association read outside the request that loaded it
+  throws, so do not hold one anywhere longer than the request.
+- **The identity map means "the same object" within a request.** Between
+  requests the manager is cleared, so the next one reads the database again.
+- **The framework maps the `users` table.** A large opinion, held deliberately:
+  adding columns to `User` is how an application extends what auth knows about.
+  An application that needs a different shape maps its own entity behind the
+  same `UserProvider`.
+
+**`UserProvider` was the ORM seam, and it earned it.** `SessionGuard`, every
+middleware and every component talked to this interface and never to a row — so
+the day `User` became an entity, nothing above this line had to change.
 
 ## CSRF and what is exempt
 

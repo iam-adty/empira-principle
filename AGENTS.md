@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `802 tests, 1461 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `810 tests, 1478 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -66,7 +66,8 @@ printed. That check is why `composer test` means what it says — read
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
 | `src/Data/` | `Connection`, `Query`, `Db`, `Grammar` + dialects, `Migrator`, `ConnectionFactory` |
 | `src/Config/` | `.env` parsing, dot-notation config, `DatabaseConfig` (the one reader for `DB_*`) |
-| `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth` |
+| `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth`, and `User` — which is a Doctrine entity |
+| `src/Persistence/` | `EntityManagerFactory` — the manager, and how it is built |
 | `src/Security/Csrf.php` | Session-backed CSRF for component actions |
 | `src/Testing/` | `TestClient`, `TestResponse` |
 | `src/Console/` | CLI kernel, commands, and `Bootstrap` (finding a project's own commands) |
@@ -179,6 +180,23 @@ guard then reads a session nothing writes to. See
 **Anything built at boot and held is frozen at whichever request came first.**
 That is what `$app->use(new Middleware(...))` does to a middleware's `Format`
 and `Auth`. Pass the class-string; the pipeline rebuilds it per request.
+
+**An EntityManager outlives the request, and its identity map does not forget.**
+Exactly the session trap above, in a library rather than in PHP. `find()` on an
+entity the manager has already loaded returns the **cached object without
+touching the database**. Under php-fpm this is invisible — the process ends with
+the request. Under a worker it means request two is served request one's user:
+silently, with nothing in any log, and only when two requests happen to land on
+the same thread. `Application::handle()` calls `clear()` for exactly this reason,
+next to `Session::beginRequest()`. Do not move it, and do not cache an entity
+anywhere longer than the request that loaded it.
+
+**An ORM entity is not a value object.** `$user->id` became `$user->id()` because
+the id is now assigned by the ORM on flush. More importantly, a `User` handed to
+a component is **managed**: it belongs to an EntityManager, a lazy association
+read outside its request throws, and two requests in one run are not the same
+object. `SessionGuard` stores the scalar id and loads per request for that
+reason.
 
 ### Fixed — do not reintroduce
 

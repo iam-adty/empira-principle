@@ -25,6 +25,8 @@ use IamAdty\Empira\Routing\RouteRegistrar;
 use IamAdty\Empira\Routing\RouteRegistry;
 use IamAdty\Empira\Routing\UrlGenerator;
 use IamAdty\Empira\Security\Csrf;
+use IamAdty\Empira\Persistence\EntityManagerFactory;
+use Doctrine\ORM\EntityManagerInterface;
 use IamAdty\Empira\State\NullState;
 use IamAdty\Empira\State\StateStore;
 use IamAdty\Empira\Validation\ValidationException;
@@ -221,17 +223,9 @@ final class Application
      */
     public function database(?array $config = null): self
     {
-        $items = $config;
+        $items = $this->dbConfig($config);
 
-        if ($items === null) {
-            $bound = $this->container->bound(Config::class)
-                ? $this->container->get(Config::class)
-                : null;
-
-            $items = $bound instanceof Config ? ($bound->array('db') ?: null) : null;
-        }
-
-        $connection = ConnectionFactory::make(new Config($items ?? []));
+        $connection = ConnectionFactory::make(new Config($items));
         $db = new Db($connection);
 
         $this->db = $db;
@@ -239,6 +233,29 @@ final class Application
         $this->container->instance(Db::class, $db);
 
         return $this;
+    }
+
+    /**
+     * The database settings, from the argument or from `db.*` in the container's
+     * Config.
+     *
+     * Shared by {@see database()} and {@see orm()} because the two must be
+     * handed the same answer. They were not, and the symptom was a migration
+     * command reading one set of defaults while the runtime read another.
+     *
+     * @return array<string, mixed>
+     */
+    private function dbConfig(?array $config): array
+    {
+        if ($config !== null) {
+            return $config;
+        }
+
+        $bound = $this->container->bound(Config::class)
+            ? $this->container->get(Config::class)
+            : null;
+
+        return $bound instanceof Config ? ($bound->array('db') ?: []) : [];
     }
 
     /**
@@ -253,6 +270,54 @@ final class Application
         }
 
         return $this->db;
+    }
+
+    /**
+     * Wire the ORM and make `EntityManagerInterface` autowirable from here on.
+     *
+     *     $app->orm(['driver' => 'sqlite', 'database' => __DIR__ . '/app.sqlite']);
+     *
+     *     // …now in any component, controller or middleware:
+     *     public function __construct(private readonly EntityManagerInterface $em) {}
+     *
+     * Configuration is the same flat shape {@see database()} takes, and it goes
+     * through the same {@see DatabaseConfig} reader, so the runtime and
+     * `empira migrate` cannot disagree about which database either of them
+     * means.
+     *
+     * `entityPaths` defaults to the framework's own directory. An application
+     * with entities of its own passes them too — the framework's `Auth` entities
+     * should still be mapped, or {@see DoctrineUserProvider} cannot find a user.
+     *
+     * @param list<string> $entityPaths directories holding `#[Entity]` classes
+     */
+    public function orm(?array $config = null, array $entityPaths = []): self
+    {
+        $items = $this->dbConfig($config);
+
+        $this->container->instance(
+            EntityManagerInterface::class,
+            EntityManagerFactory::make(
+                new Config($items),
+                $entityPaths === [] ? [__DIR__ . '/Auth'] : array_merge([__DIR__ . '/Auth'], $entityPaths),
+            ),
+        );
+
+        return $this;
+    }
+
+    /**
+     * The ORM, once {@see Application::orm()} has been called.
+     */
+    public function entities(): EntityManagerInterface
+    {
+        if (!$this->container->bound(EntityManagerInterface::class)) {
+            throw new \LogicException(
+                'No ORM is configured. Call $app->orm() during boot before asking for one.'
+            );
+        }
+
+        return $this->container->get(EntityManagerInterface::class);
     }
 
     /**
@@ -390,6 +455,20 @@ final class Application
         // session is the one piece of state where that outlives *wrongly* — see
         // Session::beginRequest(), which is why the reason lives there.
         $this->container->get(Session::class)->beginRequest();
+
+        // The ORM's equivalent, and for the same reason. An EntityManager
+        // keeps an **identity map**: every entity it has loaded stays loaded,
+        // and asking for one of them again returns the old object without
+        // touching the database. Under php-fpm that is invisible, because the
+        // process ends with the request. Under a worker it means request two is
+        // served request one's user — silently, with nothing in any log.
+        //
+        // `clear()` detaches everything rather than closing the manager, so the
+        // next request reads from the database again and the connection is
+        // still the one opened at boot.
+        if ($this->container->bound(EntityManagerInterface::class)) {
+            $this->container->get(EntityManagerInterface::class)->clear();
+        }
 
         // A worker's connection is opened once and kept, so its statement log
         // would otherwise grow for as long as the process lives.

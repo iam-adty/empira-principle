@@ -38,6 +38,26 @@ final class AuthTest extends TestCase
         return new Application(self::SECRET, new \IamAdty\Empira\State\NullState());
     }
 
+    /**
+     * A user that looks as though it came out of the database.
+     *
+     * `User` is an entity now, and its id is private and assigned by the ORM on
+     * flush. These tests are about auth — who is asking, what the guard returns,
+     * what lands in the session — and none of them is about persistence, so
+     * rather than flush an entity per test the id is set directly.
+     *
+     * Reflection, deliberately: a public `setId()` would be a way to claim an
+     * identity that was never issued, and it would exist only for these tests.
+     */
+    public static function persisted(int $id, string $email = 'ada@example.com', string $name = 'Ada'): User
+    {
+        $user = new User($email, $name);
+
+        (new \ReflectionProperty(User::class, 'id'))->setValue($user, $id);
+
+        return $user;
+    }
+
     private function request(string $method = 'GET', string $path = '/', array $headers = []): Request
     {
         return new Request($method, $path, headers: $headers);
@@ -47,7 +67,7 @@ final class AuthTest extends TestCase
 
     public function testABearerGuardReadsTheAuthorizationHeader(): void
     {
-        $ada = new User(1, ['name' => 'Ada']);
+        $ada = self::persisted(1, 'ada@example.com', 'Ada');
         $guard = new BearerGuard(fn(string $token): ?User => $token === 'secret' ? $ada : null);
 
         $this->assertSame($ada, $guard->identify($this->request(headers: ['authorization' => 'Bearer secret'])));
@@ -57,7 +77,7 @@ final class AuthTest extends TestCase
     {
         // RFC 7235 defines the scheme case-insensitively and clients send it
         // however they like.
-        $guard = new BearerGuard(fn(string $t): ?User => $t === 'secret' ? new User(1) : null);
+        $guard = new BearerGuard(fn(string $t): ?User => $t === 'secret' ? self::persisted(1) : null);
 
         $this->assertNotNull($guard->identify($this->request(headers: ['authorization' => 'bearer secret'])));
         $this->assertNotNull($guard->identify($this->request(headers: ['authorization' => 'BEARER secret'])));
@@ -65,7 +85,7 @@ final class AuthTest extends TestCase
 
     public function testABearerGuardIgnoresAnythingThatIsNotItsScheme(): void
     {
-        $guard = new BearerGuard(fn(string $t): ?User => new User(1));
+        $guard = new BearerGuard(fn(string $t): ?User => self::persisted(1));
 
         $this->assertNull($guard->identify($this->request(headers: ['authorization' => 'Basic c3RhbGU6'])));
         $this->assertNull($guard->identify($this->request(headers: ['authorization' => 'Bearer'])));
@@ -95,9 +115,9 @@ final class AuthTest extends TestCase
 
     public function testAuthResolvesTheFirstGuardThatAnswers(): void
     {
-        $ada = new User(1);
+        $ada = self::persisted(1);
         $auth = new Auth([
-            new BearerGuard(fn(string $t): ?User => $t === 'bearer' ? new User(2) : null),
+            new BearerGuard(fn(string $t): ?User => $t === 'bearer' ? self::persisted(2) : null),
             new BearerGuard(fn(string $t): ?User => $t === 'bearer' ? $ada : null),
         ], $this->request(headers: ['authorization' => 'Bearer bearer']));
 
@@ -116,7 +136,7 @@ final class AuthTest extends TestCase
             {
                 $this->calls++;
 
-                return new User(1);
+                return AuthTest::persisted(1);
             }
         };
 
@@ -131,7 +151,7 @@ final class AuthTest extends TestCase
     public function testAuthWithoutARequestFindsNobody(): void
     {
         // A console command has no request, and must not be handed a user.
-        $auth = new Auth([new BearerGuard(fn(string $t): ?User => new User(1))]);
+        $auth = new Auth([new BearerGuard(fn(string $t): ?User => self::persisted(1))]);
 
         $this->assertTrue($auth->guest());
     }
@@ -139,7 +159,7 @@ final class AuthTest extends TestCase
     public function testAuthRemembersWhichGuardAnswered(): void
     {
         $auth = new Auth([
-            new BearerGuard(fn(string $t): ?User => new User(9)),
+            new BearerGuard(fn(string $t): ?User => self::persisted(9)),
         ], $this->request(headers: ['authorization' => 'Bearer x']));
 
         $this->assertInstanceOf(BearerGuard::class, $auth->guard());
@@ -161,7 +181,7 @@ final class AuthTest extends TestCase
     {
         $app = $this->app();
         $app->routes()->get('/secret', static fn(): string => 'shh', 'secret');
-        $app->auth(new BearerGuard(fn(string $t): ?User => new User(1)));
+        $app->auth(new BearerGuard(fn(string $t): ?User => self::persisted(1)));
         $app->use(RequireAuth::class);
 
         $response = $app->handle($this->request(headers: ['authorization' => 'Bearer x'], path: '/secret'));
@@ -203,7 +223,7 @@ final class AuthTest extends TestCase
         $app->routes()->get('/who', static function (Auth $auth): Response {
             return Response::html((string) ($auth->id() ?? 'nobody'));
         }, 'who');
-        $app->auth(new BearerGuard(fn(string $t): ?User => $t === 'ada' ? new User(1) : null));
+        $app->auth(new BearerGuard(fn(string $t): ?User => $t === 'ada' ? self::persisted(1) : null));
 
         $first = $app->handle($this->request(headers: ['authorization' => 'Bearer ada'], path: '/who'));
         $second = $app->handle($this->request(path: '/who'));
@@ -223,7 +243,7 @@ final class AuthTest extends TestCase
         // Auth is bound per request, so signing in means asking the instance
         // this request produced.
         $app->handle($this->request(path: '/who'));
-        $app->container()->get(Auth::class)->login(new User(7, ['name' => 'Ada']));
+        $app->container()->get(Auth::class)->login(self::persisted(7, 'ada@example.com', 'Ada'));
 
         $this->assertSame('7', $app->handle($this->request(path: '/who'))->body());
     }
@@ -235,7 +255,7 @@ final class AuthTest extends TestCase
         $app->routes()->get('/who', static fn(Auth $auth): Response => Response::html((string) ($auth->id() ?? 'nobody')), 'who');
 
         $app->handle($this->request(path: '/who'));
-        $app->container()->get(Auth::class)->login(new User(7));
+        $app->container()->get(Auth::class)->login(self::persisted(7));
         $this->assertSame('7', $app->handle($this->request(path: '/who'))->body());
 
         $app->container()->get(Auth::class)->logout();
@@ -262,7 +282,7 @@ final class AuthTest extends TestCase
 
         $this->assertSame(0, $rotator->rotated);
 
-        $guard->login(new User(7));
+        $guard->login(self::persisted(7));
 
         $this->assertSame(1, $rotator->rotated, 'login must rotate, or the id is fixated');
         $this->assertSame(7, $session->get('user_id'));
@@ -270,19 +290,19 @@ final class AuthTest extends TestCase
 
     public function testLoggingInWithoutASessionGuardSaysSo(): void
     {
-        $auth = new Auth([new BearerGuard(fn(string $t): ?User => new User(1))]);
+        $auth = new Auth([new BearerGuard(fn(string $t): ?User => self::persisted(1))]);
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('No session guard');
 
-        $auth->login(new User(1));
+        $auth->login(self::persisted(1));
     }
 
     // ---------------------------------------------------------------- CSRF
 
     public function testABearerAuthenticatedPostIsExemptFromCsrf(): void
     {
-        $app = $this->guardedApp(new BearerGuard(fn(string $t): ?User => new User(1)));
+        $app = $this->guardedApp(new BearerGuard(fn(string $t): ?User => self::persisted(1)));
 
         $response = $app->handle($this->request('POST', '/api', ['authorization' => 'Bearer x']));
 
@@ -302,7 +322,7 @@ final class AuthTest extends TestCase
 
         // Sign in on one request…
         $app->handle($this->request());
-        $app->container()->get(Auth::class)->login(new User(7));
+        $app->container()->get(Auth::class)->login(self::persisted(7));
 
         // …then post with no token on the next.
         $this->assertSame(419, $app->handle($this->request('POST', '/api'))->status());
@@ -326,47 +346,6 @@ final class AuthTest extends TestCase
         $this->assertSame(419, $app->handle($this->request('POST', '/ordinary'))->status());
     }
 
-    // -------------------------------------------------- database provider
-
-    public function testTheDatabaseProviderFindsUsersByIdAndCredential(): void
-    {
-        $users = $this->databaseUsers();
-
-        $this->assertSame('Ada', $users->byId(1)?->attribute('name'));
-        $this->assertSame('Ada', $users->byCredential('ada@example.com')?->attribute('name'));
-        $this->assertNull($users->byId(99));
-        $this->assertNull($users->byCredential('nobody@example.com'));
-    }
-
-    public function testTheDatabaseProviderNeverHandsOutAPasswordHash(): void
-    {
-        $user = $this->databaseUsers()->byId(1);
-
-        $this->assertNotNull($user);
-        $this->assertArrayNotHasKey('password_hash', $user->attributes);
-        $this->assertSame('ada@example.com', $user->attribute('email'));
-    }
-
-    public function testTheDatabaseProviderVerifiesPasswords(): void
-    {
-        $users = $this->databaseUsers();
-        $ada = $users->byId(1);
-
-        $this->assertNotNull($ada);
-        $this->assertTrue($users->verifyPassword($ada, 'correct horse'));
-        $this->assertFalse($users->verifyPassword($ada, 'wrong horse'));
-        $this->assertFalse($users->verifyPassword($ada, ''));
-    }
-
-    public function testAUserWithNoStoredHashCannotBeAuthenticated(): void
-    {
-        $users = $this->databaseUsers();
-        $ghost = $users->byId(2);
-
-        $this->assertNotNull($ghost);
-        $this->assertFalse($users->verifyPassword($ghost, 'anything'), 'a missing hash is not a wildcard');
-    }
-
     // ----------------------------------------------------------- helpers
 
     private function users(): UserProvider
@@ -374,7 +353,7 @@ final class AuthTest extends TestCase
         return new class implements UserProvider {
             public function byId(int|string $id): ?User
             {
-                return (string) $id === '7' ? new User(7, ['name' => 'Ada']) : null;
+                return (string) $id === '7' ? AuthTest::persisted(7, 'ada@example.com', 'Ada') : null;
             }
 
             public function byCredential(string $credential): ?User
@@ -387,35 +366,6 @@ final class AuthTest extends TestCase
                 return false;
             }
         };
-    }
-
-    private function databaseUsers(): DatabaseUserProvider
-    {
-        $connection = Connection::sqlite(':memory:');
-        $connection->execute('CREATE TABLE users (
-            id INTEGER PRIMARY KEY,
-            email TEXT NOT NULL,
-            name TEXT NOT NULL,
-            password_hash TEXT
-        )');
-
-        $db = new Db($connection);
-        $users = new DatabaseUserProvider($db);
-
-        // Db::insert() rather than Query::insert(): the latter only records the
-        // write and waits for a terminal call, which is a confusing way to seed
-        // a fixture.
-        $db->insert('users', [
-            'id' => 1,
-            'email' => 'ada@example.com',
-            'name' => 'Ada',
-            'password_hash' => $users->hash('correct horse'),
-        ]);
-
-        // Deliberately has no hash at all.
-        $db->insert('users', ['id' => 2, 'email' => 'ghost@example.com', 'name' => 'Ghost']);
-
-        return $users;
     }
 
     private function guardedApp(Guard $guard): Application

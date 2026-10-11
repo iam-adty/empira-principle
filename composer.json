@@ -14,6 +14,7 @@
         "php": "^8.4",
         "doctrine/dbal": "^4.3",
         "doctrine/migrations": "^3.9",
+        "doctrine/orm": "^3.5",
         "psr/log": "^3.0"
     },
     "require-dev": {
