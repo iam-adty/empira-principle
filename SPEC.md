@@ -172,14 +172,14 @@ See [docs/auth.md](docs/auth.md).
 
 ---
 
-## 4. Explicit session write-back `[planned]`
+## 4. Explicit session write-back `[shipped]`
 
 ### The problem
 
-`Application::handle()` opens the session at the start of every request and
-never closes it at the end. `Session::beginRequest()` writes back the
+`Application::handle()` opened the session at the start of every request and
+never closed it at the end. `Session::beginRequest()` wrote back the
 *previous* request's data before loading the current one, so the framework's own
-model says the save happens at the start of the *next* request on the same
+model said the save happened at the start of the *next* request on the same
 worker.
 
 Under a long-running worker that model is wrong, and wrong in the way that
@@ -188,12 +188,13 @@ next request almost never returns to the same worker. If the deferred write-back
 were the only mechanism, a sign-in would fail to survive to the following
 request roughly 31 times in 32.
 
-It is not the only mechanism. FrankenPHP flushes `$_SESSION` during per-request
-teardown, which is why the application works — verified by reading the session
+It was not the only mechanism. FrankenPHP flushes `$_SESSION` during per-request
+teardown, which is why the application worked — verified by reading the session
 file immediately after a response and finding the token already in it. But that
-is undocumented runtime behaviour the framework does not control, and it is the
-opposite of what our own code assumes. **The application is correct by
-accident**, resting on a property we never asked for and cannot see fail.
+was undocumented runtime behaviour the framework did not control, and the
+opposite of what our own code assumed. **The application was correct by
+accident**, resting on a property nobody had asked for and nobody could see
+fail.
 
 ### The design
 
@@ -209,20 +210,28 @@ end of a request**, called from the `finally` that already clears the context.
 
 Symmetry with `beginRequest()` is the entire point: reset at the start, close at
 the end. It also bounds the session lock to the request rather than to the
-runtime's teardown, which matters the first time an early-return path is added
-and the runtime's behaviour changes underneath us.
+runtime's teardown, which matters the first time an early-return path is added.
 
-### What it does not change
+`endRequest()` is deliberately **not** gated on the CLI, where `beginRequest()` is.
+There the guard exists because `$_SESSION` is an in-process array standing in for
+a session and must survive between requests. Closing a session that was actually
+started is correct in every SAPI — and it is what lets a test open one by hand
+and prove the call runs.
 
-Nothing observable. The file is written at the same point either way. This makes
-*us* the thing writing it, and gives the property a test that can fail — which
-is the difference between a guarantee and an observation.
+### What it did not change
+
+Nothing observable. The file was written at the same point either way. What it
+changed is that *we* are the thing writing it, and the property has a test that
+can fail — which is the difference between a guarantee and an observation. The
+test opens a real session by pointing `session.save_path` at the workspace
+`tmp/` and asserting `handle()` left it closed; under the CLI alone that
+assertion would have been vacuous, because the framework never opens one there.
 
 ### Files
 
 - `src/Http/Session.php` — `endRequest()`, beside `beginRequest()`
 - `src/Application.php` — the `finally` in `handle()`
-- `tests/WorkerTest.php` — the test that fails without it
+- `tests/WorkerTest.php` — two tests, both failing without the change
 
 ---
 

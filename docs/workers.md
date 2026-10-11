@@ -58,7 +58,7 @@ Everything below happens in `Application::handle()`, before dispatch:
 | `Request`, `Context`, `Format`, `RouteParams` | A fresh instance is bound per request. |
 | `Auth` | Rebuilt per request from the guards and this request. |
 | `Response` | A fresh instance per request. |
-| `Session` | **Shared** — see below — and reset by `beginRequest()`. |
+| `Session` | **Shared** — see below — reset by `beginRequest()`, closed by `endRequest()`. |
 | `Connection` | Kept, because a connection per request defeats the point. Its statement log is cleared. |
 | `Registry`, `TokenCodec`, `Csrf`, the route table | Stateless or boot-time config. Persisting is correct. |
 | `Component::$nonce` | Minted per instance, so ids, state keys and tokens are unique per request with no reset. |
@@ -108,6 +108,22 @@ version of this fix made it per request, and that was wrong: `$app->auth(new
 SessionGuard($app->session(), …))` captures the session at boot, so a fresh
 instance per request leaves every guard reading a session nothing writes to.
 Shared-and-reset is the shape that works.
+
+**The request must also hand the session back.** `Session::endRequest()` closes
+it in the same `finally` that clears the context, so the write-back belongs to
+the request that made the change. Without it the file is not updated until
+whichever request this worker serves *next* calls `beginRequest()` — and at 32
+workers there may not be a next one here for some time.
+
+That gap was invisible, because FrankenPHP flushes `$_SESSION` during per-request
+teardown anyway. The application worked while resting on undocumented runtime
+behaviour that contradicted our own model. Closing it ourselves costs one write
+and makes the guarantee ours.
+
+Note the asymmetry, which is deliberate: `beginRequest()` is gated on the CLI and
+`endRequest()` is not. Under the CLI the `$_SESSION` array has to survive between
+requests, so there is nothing to close; a session that genuinely *was* started is
+correct to close anywhere.
 
 ## Rules for your own code
 

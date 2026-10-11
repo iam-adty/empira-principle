@@ -347,6 +347,11 @@ final class Application
         } catch (\Throwable $e) {
             $response = $this->renderException($e, $request, $context->response);
         } finally {
+            // The request is over, so it must not leave the session open. The
+            // lock and the write-back both belong to this request, not to
+            // whichever one this worker serves next — see Session::endRequest().
+            $this->container->get(Session::class)->endRequest();
+
             // A context outliving its request is how `view()` outside a dispatch
             // ends up mutating a response that has already been sent.
             $this->context = null;

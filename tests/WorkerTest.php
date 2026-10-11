@@ -181,6 +181,55 @@ final class WorkerTest extends TestCase
         self::assertSame(200, $response->status());
     }
 
+    // --------------------------------------------------------- session close
+
+    public function testARequestLeavesNoSessionOpen(): void
+    {
+        $app = $this->app();
+
+        // Under the CLI the framework never opens a session, so asserting on
+        // `session_status()` alone would pass whether or not anything closed it
+        // — a test that proves nothing. Open one by hand instead: the save path
+        // is the workspace `tmp/`, never the system temp directory.
+        $savePath = ini_get('session.save_path');
+        ini_set('session.save_path', Temp::root());
+
+        try {
+            session_start();
+            $id = session_id();
+
+            self::assertSame(PHP_SESSION_ACTIVE, session_status(), 'precondition');
+
+            $app->handle(new Request('GET', '/'));
+
+            // The whole point. Left open, the session file is not updated until
+            // whichever request this worker serves *next* calls beginRequest() —
+            // and at 32 workers there may not be a next one on this worker for a
+            // while.
+            self::assertSame(PHP_SESSION_NONE, session_status());
+        } finally {
+            // Closing writes the file; it does not remove it, and this suite
+            // shares a process with everything else.
+            if (is_string($id) && $id !== '') {
+                @unlink(Temp::root() . '/sess_' . $id);
+            }
+
+            ini_set('session.save_path', $savePath === false ? '' : $savePath);
+        }
+    }
+
+    public function testClosingAnUnopenedSessionIsHarmless(): void
+    {
+        $app = $this->app();
+
+        // The common case: most requests never touch the session at all, so this
+        // has to be free and, more importantly, not an error.
+        $response = $app->handle(new Request('GET', '/'));
+
+        self::assertSame(404, $response->status());
+        self::assertSame(PHP_SESSION_NONE, session_status());
+    }
+
     // ------------------------------------------------------------ connection
 
     public function testTheStatementLogDoesNotGrowAcrossRequests(): void

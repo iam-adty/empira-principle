@@ -106,6 +106,23 @@ can change without a major bump, though changes are always documented here.
 
 ### Fixed
 
+- **A request never handed the session back.** `handle()` opened the session and
+  never closed it, leaving the write-back to happen at the start of whatever
+  request this worker served *next* — which, at the 32 workers the reference
+  application ships, is usually a different worker entirely. A sign-in would
+  have failed to survive to the next request roughly 31 times in 32.
+
+  It did not, because FrankenPHP flushes `$_SESSION` during per-request teardown.
+  The application was correct by accident: working, and resting on undocumented
+  runtime behaviour that contradicted the framework's own model. `Session::
+  endRequest()` closes it in the `finally` that already clears the context, so
+  the lock and the write-back belong to the request that made the change.
+
+  Two tests, both failing without it. The obvious one — assert `handle()` left
+  no session open — would have been vacuous under the CLI, where the framework
+  never opens one, so the test opens a real session by pointing
+  `session.save_path` at the workspace `tmp/` first.
+
 - **A session survived the request that opened it, in a long-running worker.**
   `Session` is a container singleton whose `begun` latch stops its flash buckets
   rotating more than once — which, in a worker, means never. So `session_start()`

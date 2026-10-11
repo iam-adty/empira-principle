@@ -155,6 +155,33 @@ final class Session implements SessionId
         $_SESSION = [];
     }
 
+    /**
+     * Close the session, so the request that ends here is the last thing to
+     * write it.
+     *
+     * `beginRequest()` opens the next one and does the saving; that would mean
+     * the session file was not updated until the *following* request arrived on
+     * this worker, which at 32 workers it usually does not. So the write-back
+     * belongs here, at the end of the request that made the change, rather than
+     * being left to whatever the runtime does with `$_SESSION` when it tears a
+     * request down. Framework behaviour should not rest on that being so.
+     *
+     * Deliberately not gated on the CLI, where `beginRequest()` is. There, the
+     * guard exists because `$_SESSION` is an in-process array standing in for a
+     * session and has to survive between the requests a test drives. Closing a
+     * session that was actually started is correct in every SAPI — and it is
+     * what lets a test open one by hand and prove this runs.
+     *
+     * Called from `Application::handle()`, in the same `finally` that clears the
+     * context, so it happens even when the dispatch threw.
+     */
+    public function endRequest(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+    }
+
     private function begin(): void
     {
         // The session is prepared once per instance — and an instance is
