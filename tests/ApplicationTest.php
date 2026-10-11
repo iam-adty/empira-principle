@@ -22,6 +22,17 @@ final class ApplicationTest extends TestCase
 {
     private const SECRET = 'a-secret-that-is-long-enough';
 
+    public function testTrustingProxiesIsChainable(): void
+    {
+        // The shape of the API, and that it can be turned back off — a
+        // deployment that enables it by accident needs a way to undo that
+        // without a code change.
+        $app = new Application(self::SECRET, new MemoryStore());
+
+        $this->assertSame($app, $app->trustProxies());
+        $this->assertSame($app, $app->trustProxies(false));
+    }
+
     private function app(?MemoryStore $store = null): Application
     {
         return new Application(self::SECRET, $store ?? new MemoryStore());

@@ -27,6 +27,8 @@ final class Request
         array $headers = [],
         public readonly array $cookies = [],
         public readonly array $files = [],
+        public readonly ?string $remoteAddress = null,
+        public readonly bool $trustProxy = false,
     ) {
         $normalised = [];
 
@@ -38,9 +40,15 @@ final class Request
     }
 
     /**
-     * Build from PHP superglobals.
-     */
-    public static function capture(): self
+ * Build from PHP superglobals.
+ *
+ * `$trustProxy` is the deployment's answer to "is anything in front of me",
+ * and it belongs here rather than being a parameter of {@see ip()} so that
+ * every caller gets the same answer. A method argument would mean remembering
+ * it at each call site, and the failure mode of forgetting is a log full of
+ * plausible wrong addresses.
+ */
+public static function capture(bool $trustProxy = false): self
     {
         $headers = [];
 
@@ -72,6 +80,8 @@ final class Request
             headers: $headers,
             cookies: $_COOKIE,
             files: $_FILES,
+            remoteAddress: isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : null,
+            trustProxy: $trustProxy,
         );
     }
 
@@ -96,6 +106,47 @@ final class Request
     public function isMethod(string $method): bool
     {
         return strtoupper($this->method) === strtoupper($method);
+    }
+
+    /**
+     * Who this request appears to come from, or null when that cannot be said.
+     *
+     * The socket address by default, and the socket address **only** by default.
+     * `X-Forwarded-For` and its relatives are set by whoever sent the request,
+     * so trusting them without a proxy in front means anyone can put any
+     * address they like into your logs — which defeats the purpose of logging
+     * an address at all. Behind a proxy it is the reverse problem: every
+     * request arrives from the proxy, and a log full of one repeated address is
+     * worse than none because it looks like data.
+     *
+     * Both are wrong by default and right by configuration, which is why
+     * {@see \IamAdty\Empira\Application::trustProxies()} exists.
+     *
+     * Everything is validated. A malformed header, or a `REMOTE_ADDR` that is a
+     * unix socket path rather than an address, returns null instead of
+     * something that would be written into a log and believed later.
+     */
+    public function ip(): ?string
+    {
+        if ($this->trustProxy) {
+            // A forwarded chain is oldest-first, so the client is at the head.
+            $chain = $this->header('x-forwarded-for');
+
+            $candidate = is_string($chain) && trim($chain) !== ''
+                ? trim(explode(',', $chain)[0])
+                : ($this->header('x-real-ip') ?? $this->header('cf-connecting-ip'));
+
+            if (is_string($candidate) && self::isAddress($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return $this->isAddress($this->remoteAddress ?? '') ? $this->remoteAddress : null;
+    }
+
+    private static function isAddress(string $value): bool
+    {
+        return $value !== '' && filter_var($value, FILTER_VALIDATE_IP) !== false;
     }
 
     /**

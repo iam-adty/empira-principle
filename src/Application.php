@@ -83,6 +83,15 @@ final class Application
     /** The parameters the current route matched. */
     private ?RouteParams $params = null;
 
+    /**
+     * Whether a reverse proxy is in front, and its headers may be believed.
+     *
+     * Off by default because the consequence of being wrong is silent: a log
+     * full of addresses the client chose, which is the one thing a rate limiter
+     * must not be built on.
+     */
+    private bool $trustProxies = false;
+
     /** @var list<\IamAdty\Empira\Auth\Guard> */
     private array $guards = [];
 
@@ -378,7 +387,7 @@ final class Application
     public function makeContext(?Request $request = null): Context
     {
         return new Context(
-            request: $request ?? Request::capture(),
+            request: $request ?? Request::capture($this->trustProxies),
             response: new Response(),
             registry: $this->registry,
             tokens: $this->tokens,
@@ -458,6 +467,27 @@ final class Application
         }
 
         return $response;
+    }
+
+    /**
+     * Believe the proxy headers when deciding who a request came from.
+     *
+     *     $app->trustProxies();   // nginx, Caddy, Cloudflare in front
+     *
+     * Off unless asked for. `X-Forwarded-For` is set by whoever sent the
+     * request, so with nothing in front of the application it is a value the
+     * client chose — and a log full of client-chosen addresses is worse than no
+     * addresses, because it looks like evidence.
+     *
+     * Turn it on only when something genuinely rewrites the address. The reverse
+     * mistake is quieter: behind a proxy every request arrives from the proxy,
+     * so a log with one repeated value is a lie rather than an absence.
+     */
+    public function trustProxies(bool $trust = true): self
+    {
+        $this->trustProxies = $trust;
+
+        return $this;
     }
 
     /**
@@ -610,7 +640,7 @@ final class Application
      */
     public function view(string $layout, array $data = [], ?Request $request = null): Response
     {
-        $request ??= $this->context?->request ?? Request::capture();
+        $request ??= $this->context?->request ?? Request::capture($this->trustProxies);
 
         $params = $this->params ?? new RouteParams();
         $merged = $params->merge($data);
@@ -756,7 +786,7 @@ final class Application
      */
     public function send(?Request $request = null): never
     {
-        $this->handle($request ?? Request::capture())->send();
+        $this->handle($request ?? Request::capture($this->trustProxies))->send();
     }
 
     /**
@@ -790,7 +820,7 @@ final class Application
      */
     public function respond(?Request $request = null): void
     {
-        ($this->handle($request ?? Request::capture()))->emit();
+        ($this->handle($request ?? Request::capture($this->trustProxies)))->emit();
     }
 
 /**

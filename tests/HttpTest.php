@@ -69,6 +69,132 @@ final class HttpTest extends TestCase
         $this->assertSame('/a/b', (new Request('GET', '/a/b?x=1#frag'))->path());
     }
 
+    // ------------------------------------------------------- client address
+
+    public function testThereIsNoClientAddressWhenTheRequestCarriesNone(): void
+    {
+        // The CLI has no REMOTE_ADDR, and that is the common case in the suite.
+        // Returning null rather than a guess is the point: a wrong address in a
+        // log is believed later.
+        $this->assertNull((new Request('GET', '/'))->ip());
+    }
+
+    public function testTheSocketAddressIsUsedWhenThereIsOne(): void
+    {
+        $request = new Request('GET', '/', remoteAddress: '203.0.113.9');
+
+        $this->assertSame('203.0.113.9', $request->ip());
+    }
+
+    public function testForwardedHeadersAreIgnoredUnlessProxiesAreTrusted(): void
+    {
+        // The security test. With nothing in front of the application,
+        // X-Forwarded-For is a value the client chose, and a rate limiter built
+        // on it would be evaded by rotating a header.
+        $request = new Request(
+            'GET',
+            '/',
+            headers: ['x-forwarded-for' => '198.51.100.7'],
+            remoteAddress: '203.0.113.9',
+        );
+
+        $this->assertSame('203.0.113.9', $request->ip());
+    }
+
+    public function testForwardedHeadersAreUsedWhenProxiesAreTrusted(): void
+    {
+        $request = new Request(
+            'GET',
+            '/',
+            headers: ['x-forwarded-for' => '198.51.100.7'],
+            remoteAddress: '10.0.0.1',
+            trustProxy: true,
+        );
+
+        $this->assertSame('198.51.100.7', $request->ip());
+    }
+
+    public function testTheClientIsTheHeadOfAForwardedChain(): void
+    {
+        // "client, proxy1, proxy2" — oldest first, so the client leads. Taking
+        // the tail would record the nearest proxy every time.
+        $request = new Request(
+            'GET',
+            '/',
+            headers: ['x-forwarded-for' => ' 198.51.100.7 , 10.0.0.1 , 10.0.0.2'],
+            remoteAddress: '10.0.0.1',
+            trustProxy: true,
+        );
+
+        $this->assertSame('198.51.100.7', $request->ip());
+    }
+
+    public function testARealIpHeaderIsUsedWhenThereIsNoForwardedChain(): void
+    {
+        $request = new Request(
+            'GET',
+            '/',
+            headers: ['x-real-ip' => '198.51.100.7'],
+            remoteAddress: '10.0.0.1',
+            trustProxy: true,
+        );
+
+        $this->assertSame('198.51.100.7', $request->ip());
+    }
+
+    public function testAMalformedForwardedHeaderFallsBackToTheSocket(): void
+    {
+        // "not-an-ip" must not reach a log. Returning the socket address is the
+        // honest answer; returning nothing would hide a real request.
+        $request = new Request(
+            'GET',
+            '/',
+            headers: ['x-forwarded-for' => 'not-an-ip'],
+            remoteAddress: '203.0.113.9',
+            trustProxy: true,
+        );
+
+        $this->assertSame('203.0.113.9', $request->ip());
+    }
+
+    public function testAUnixSocketRemoteAddressIsNotAnAddress(): void
+    {
+        // php-fpm over a unix socket puts a filesystem path in REMOTE_ADDR.
+        $request = new Request('GET', '/', remoteAddress: '/var/run/php-fpm.sock');
+
+        $this->assertNull($request->ip());
+    }
+
+    public function testIpv6IsAnAddress(): void
+    {
+        $request = new Request('GET', '/', remoteAddress: '2001:db8::1');
+
+        $this->assertSame('2001:db8::1', $request->ip());
+    }
+
+    public function testCaptureReadsTheSocketAddressAndOnlyTrustsProxiesWhenAsked(): void
+    {
+        // `capture()` rather than the constructor, because this is the function
+        // `Application` threads its setting into — every address the framework
+        // reports in production is decided by that argument arriving correctly.
+        $previousAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.1';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.7';
+
+        try {
+            $this->assertSame('10.0.0.1', Request::capture()->ip());
+            $this->assertSame('198.51.100.7', Request::capture(true)->ip());
+        } finally {
+            unset($_SERVER['HTTP_X_FORWARDED_FOR']);
+
+            if ($previousAddress === null) {
+                unset($_SERVER['REMOTE_ADDR']);
+            } else {
+                $_SERVER['REMOTE_ADDR'] = $previousAddress;
+            }
+        }
+    }
+
     public function testCsrfTokenComesFromTheHeaderOrTheBody(): void
     {
         $fromHeader = new Request('POST', '/', headers: ['X-CSRF-Token' => 'abc']);
