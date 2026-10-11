@@ -8,9 +8,6 @@ use IamAdty\Empira\Config\Config;
 use IamAdty\Empira\Auth\Auth;
 use IamAdty\Empira\Auth\Guard;
 use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Data\Connection;
-use IamAdty\Empira\Data\ConnectionFactory;
-use IamAdty\Empira\Data\Db;
 use IamAdty\Empira\Html;
 use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware;
@@ -85,8 +82,6 @@ final class Application
 
     /** The parameters the current route matched. */
     private ?RouteParams $params = null;
-
-    private ?\IamAdty\Empira\Data\Db $db = null;
 
     /** @var list<\IamAdty\Empira\Auth\Guard> */
     private array $guards = [];
@@ -205,43 +200,8 @@ final class Application
     }
 
     /**
-     * Wire a database and make `Db` autowirable from here on.
-     *
-     * Before this, asking the container for `Db` throws: its constructor wants
-     * a `Connection`, which wants a `PDO`, and nothing about a `PDO` can be
-     * guessed. This is the one place the DSN is built, so it is the one place a
-     * driver name is turned into a real handle.
-     *
-     *     $app->database(['driver' => 'sqlite', 'database' => ':memory:']);
-     *
-     *     // …now in any component, controller or middleware:
-     *     public function __construct(private readonly Db $db) {}
-     *
-     * Configuration is taken as an argument or, with none, from `db.*` in the
-     * container's `Config`. Nothing is connected until this is called: an
-     * application that never asks for a database never opens one.
-     */
-    public function database(?array $config = null): self
-    {
-        $items = $this->dbConfig($config);
-
-        $connection = ConnectionFactory::make(new Config($items));
-        $db = new Db($connection);
-
-        $this->db = $db;
-        $this->container->instance(Connection::class, $connection);
-        $this->container->instance(Db::class, $db);
-
-        return $this;
-    }
-
-    /**
      * The database settings, from the argument or from `db.*` in the container's
      * Config.
-     *
-     * Shared by {@see database()} and {@see orm()} because the two must be
-     * handed the same answer. They were not, and the symptom was a migration
-     * command reading one set of defaults while the runtime read another.
      *
      * @return array<string, mixed>
      */
@@ -259,20 +219,6 @@ final class Application
     }
 
     /**
-     * The database, once {@see Application::database()} has been called.
-     */
-    public function db(): Db
-    {
-        if ($this->db === null) {
-            throw new \LogicException(
-                'No database is configured. Call $app->database() during boot before asking for one.'
-            );
-        }
-
-        return $this->db;
-    }
-
-    /**
      * Wire the ORM and make `EntityManagerInterface` autowirable from here on.
      *
      *     $app->orm(['driver' => 'sqlite', 'database' => __DIR__ . '/app.sqlite']);
@@ -280,10 +226,10 @@ final class Application
      *     // …now in any component, controller or middleware:
      *     public function __construct(private readonly EntityManagerInterface $em) {}
      *
-     * Configuration is the same flat shape {@see database()} takes, and it goes
-     * through the same {@see DatabaseConfig} reader, so the runtime and
-     * `empira migrate` cannot disagree about which database either of them
-     * means.
+     * Configuration is the flat shape the old `database()` took, and it goes
+     * through {@see DatabaseConfig} — the same reader `empira migrate` uses, so
+     * the runtime and the deploy step cannot disagree about which database
+     * either of them means.
      *
      * `entityPaths` defaults to the framework's own directory. An application
      * with entities of its own passes them too — the framework's `Auth` entities
@@ -469,11 +415,6 @@ final class Application
         if ($this->container->bound(EntityManagerInterface::class)) {
             $this->container->get(EntityManagerInterface::class)->clear();
         }
-
-        // A worker's connection is opened once and kept, so its statement log
-        // would otherwise grow for as long as the process lives.
-        $this->db?->connection()->forgetQueries();
-
 
         $context = $this->makeContext($request);
         $this->context = $context;

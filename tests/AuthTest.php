@@ -6,15 +6,12 @@ namespace IamAdty\Empira\Tests;
 
 use IamAdty\Empira\Auth\Auth;
 use IamAdty\Empira\Auth\BearerGuard;
-use IamAdty\Empira\Auth\DatabaseUserProvider;
 use IamAdty\Empira\Auth\Guard;
 use IamAdty\Empira\Auth\Middleware\RequireAuth;
 use IamAdty\Empira\Auth\SessionGuard;
 use IamAdty\Empira\Auth\User;
 use IamAdty\Empira\Auth\UserProvider;
 use IamAdty\Empira\Application;
-use IamAdty\Empira\Data\Connection;
-use IamAdty\Empira\Data\Db;
 use IamAdty\Empira\Http\Format;
 use IamAdty\Empira\Http\Middleware\VerifyCsrfToken;
 use IamAdty\Empira\Http\Request;

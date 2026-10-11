@@ -43,7 +43,7 @@ only make the window narrower.
 | Secret, registry, route table | re-derived from the environment at boot | **yes** — identical in every worker |
 | `PropBag` / `ActionMap` caches | reflection of class definitions | **yes** — same input, same output |
 | Per-request instances | discarded each request | not needed |
-| The `Db` handle | per worker | the handle is not; the data is |
+| The `EntityManager` handle | per worker | the handle is not; the identity map must be |
 
 This is why the framework has no in-process cache of user data anywhere, and why
 it should stay that way. A memoising decorator around the user repository is the
@@ -59,7 +59,7 @@ Everything below happens in `Application::handle()`, before dispatch:
 | `Auth` | Rebuilt per request from the guards and this request. |
 | `Response` | A fresh instance per request. |
 | `Session` | **Shared** — see below — reset by `beginRequest()`, closed by `endRequest()`. |
-| `Connection` | Kept, because a connection per request defeats the point. Its statement log is cleared. |
+| `EntityManagerInterface` | **Shared** — a connection per request defeats the point — but its identity map is cleared by `handle()`, or request two is served request one's user. |
 | `Registry`, `TokenCodec`, `Csrf`, the route table | Stateless or boot-time config. Persisting is correct. |
 | `Component::$nonce` | Minted per instance, so ids, state keys and tokens are unique per request with no reset. |
 

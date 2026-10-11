@@ -232,24 +232,51 @@ final class WorkerTest extends TestCase
 
     // ------------------------------------------------------------ connection
 
-    public function testTheStatementLogDoesNotGrowAcrossRequests(): void
+    public function testNothingPerRequestSurvivesOnTheWorkerBetweenRequests(): void
     {
-        $app = new Application(self::SECRET, new NullState());
-        $app->database(['driver' => 'sqlite', 'database' => ':memory:', 'log_queries' => true]);
+        // This used to be about the statement log on a long-lived connection —
+        // an array that grew for the life of the process unless something reset
+        // it, which is the one leak that only shows up after enough requests to
+        // matter. That log is gone with the hand-written data layer.
+        //
+        // The property did not go with it, though: a worker holds state that
+        // would be reset each request under php-fpm and never reset here. The
+        // ORM's is its identity map, and this is the same test pointed at it.
+        $database = Temp::file('empira-worker-');
 
-        $connection = $app->db()->connection();
+        try {
+            $app = new Application(self::SECRET, new NullState());
+            $app->orm(['driver' => 'sqlite', 'database' => $database]);
 
-        $app->handle(new Request('GET', '/'));
-        $connection->execute('SELECT 1');
+            $connection = $app->entities()->getConnection();
 
-        self::assertCount(1, $connection->queries());
+            (new \Doctrine\ORM\Tools\SchemaTool($app->entities()))->createSchema(
+                [$app->entities()->getClassMetadata(\IamAdty\Empira\Auth\User::class)]
+            );
 
-        // A worker holds one connection for the life of the process, so without
-        // a reset this array is every statement the process has ever run. It is
-        // the one leak that only shows up after enough requests to matter.
-        $app->handle(new Request('GET', '/'));
+            $app->entities()->persist(new \IamAdty\Empira\Auth\User('ada@example.com', 'Ada', 'x'));
+            $app->entities()->flush();
 
-        self::assertCount(0, $connection->queries());
+            // Warm the worker, so it has genuinely held a user once.
+            $app->handle(new Request('GET', '/'));
+            $app->entities()->getRepository(\IamAdty\Empira\Auth\User::class)->find(1);
+
+            // Changed on another connection — a second process, an admin tool.
+            $connection->executeStatement(
+                "UPDATE users SET name = ? WHERE email = ?",
+                ['Ada Lovelace', 'ada@example.com']
+            );
+
+            $app->handle(new Request('GET', '/'));
+
+            self::assertSame(
+                'Ada Lovelace',
+                $app->entities()->getRepository(\IamAdty\Empira\Auth\User::class)->find(1)?->name(),
+                'the worker served this request from the last one\'s identity map'
+            );
+        } finally {
+            Temp::remove($database);
+        }
     }
 
     // ------------------------------------------------------------- middleware

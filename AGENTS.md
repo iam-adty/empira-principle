@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `810 tests, 1478 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `475 tests, 1081 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -42,7 +42,7 @@ printed. That check is why `composer test` means what it says — read
 
 ## Where things live
 
-93 source files across 19 namespaces. The 16 files at `src/` root are the core; everything else is a subsystem.
+82 source files across 17 namespaces. The 17 files at `src/` root are the core; everything else is a subsystem.
 
 | Path | Responsibility |
 |---|---|
@@ -64,7 +64,6 @@ printed. That check is why `composer test` means what it says — read
 | `src/View/` | `Layout`, `Region` — the page shell and its swappable areas |
 | `src/Container/` | Autowiring service container |
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
-| `src/Data/` | `Connection`, `Query`, `Db`, `Grammar` + dialects, `Migrator`, `ConnectionFactory` |
 | `src/Config/` | `.env` parsing, dot-notation config, `DatabaseConfig` (the one reader for `DB_*`) |
 | `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth`, and `User` — which is a Doctrine entity |
 | `src/Persistence/` | `EntityManagerFactory` — the manager, and how it is built |
@@ -114,16 +113,18 @@ Last reviewed: 2026-10-11. These have each cost time in this codebase.
 ### Live hazards — will bite you
 
 **`self::` in a base class silently ignores subclass constants.** `AbstractGrammar`
-reads `static::OPEN` for its quote character; `self::OPEN` would bind to the base
+read `static::OPEN` for its quote character; `self::OPEN` would bind to the base
 class, every dialect would emit backticks, and PostgreSQL would reject them at
 runtime. It looked correct in review and was caught only by running against a
-real server — a unit test asserting on strings would have passed.
+real server — a unit test asserting on strings would have passed. *The grammar
+is gone now; the lesson is not, and it applies to any hierarchy with a
+subclass-dependent constant.*
 
-**A hand-written quote character is the bug the grammar exists to prevent.**
-The aggregate alias was written as ``AS `aggregate` `` straight into a format
-string. On SQLite and MySQL that is fine, which is why it survived; on
-PostgreSQL it is a syntax error. **When the framework emits SQL, every quoted
-identifier goes through the dialect.**
+**A hand-written quote character is the bug the dialect layer existed to
+prevent.** The aggregate alias was written as ``AS `aggregate` `` straight into
+a format string. On SQLite and MySQL that is fine, which is why it survived; on
+PostgreSQL it is a syntax error. **The framework no longer emits SQL by hand**,
+which is the real fix; Doctrine's platform classes own quoting now.
 
 **`usort()` returns `bool`, not the array.** It has happened here: a method did
 `$sorted = usort($rows, …)` and the sort silently did nothing, so every ordering
@@ -135,11 +136,20 @@ truthy whenever `X` is set at all. It ran a SQLite-only `PRAGMA` against
 PostgreSQL. **Parenthesise the left side**, and prefer asking the object which
 dialect it is over re-reading an environment variable.
 
+**A `catch` naming a class that does not exist compiles, and never matches.**
+`Doctrine\ORM\EntityUniqueConstraintViolationException` is not in ORM 3 — the
+exception is DBAL's `UniqueConstraintViolationException`. PHP accepts the catch
+without complaint, so a duplicate-email race would have sailed past it and
+surfaced as a 500. Only under concurrency, which is the worst time to find out.
+**When you catch a vendor exception, make sure it exists** — and catch the
+broadest one you are sure of rather than the one the library used to have.
+
 **A factory that falls back is worse than one that throws.** `ConnectionFactory`
 was handed a config section and read `db.*` from it, found nothing, and opened
 an in-memory database — a working application with no data in it. Defaults are
 fine for *values*; a default that swallows a **shape** mistake is a silent
-failure.
+failure. `DatabaseConfig` still throws on an unknown driver for this reason, and
+`orm()` still says so when it was never called.
 
 **A plain string appended to an element is escaped.** This is the rule that catches everyone:
 
@@ -260,7 +270,7 @@ A change is done when:
 - [docs/components.md](docs/components.md) — props, actions, verbs
 - [docs/routing.md](docs/routing.md) — the routing API that exists today
 - [docs/views.md](docs/views.md) — layouts, regions, fragments
-- [docs/data.md](docs/data.md) — connections, dialects, queries, migrations
+- [docs/data.md](docs/data.md) — the ORM, the EntityManager, migrations
 - [docs/auth.md](docs/auth.md) — who is asking, and CSRF exemptions
 - [docs/testing.md](docs/testing.md) — fixtures, conventions, the client
 - [docs/workers.md](docs/workers.md) — one boot, many requests, and what is reset

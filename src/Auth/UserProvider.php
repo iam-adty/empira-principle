@@ -9,9 +9,9 @@ namespace IamAdty\Empira\Auth;
  *
  * Separate from {@see Guard} on purpose. A guard answers "who is making *this*
  * request"; a provider answers "which user is that id, and is this password
- * theirs". Keeping them apart is what lets a session guard sit on top of a
- * database one today and an ORM-backed one tomorrow without auth noticing:
- * `DatabaseUserProvider` and `EloquentUserProvider` are interchangeable
+ * theirs". Keeping them apart is what let a session guard sit on a hand-written
+ * provider for years and then sit on the ORM without auth noticing:
+ * `DoctrineUserProvider` is interchangeable with any other implementation
  * because both answer this interface and nothing else.
  */
 interface UserProvider

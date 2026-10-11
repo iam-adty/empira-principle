@@ -4,18 +4,30 @@ declare(strict_types=1);
 
 namespace IamAdty\Empira\Tests;
 
-use IamAdty\Empira\Data\Connection;
-use IamAdty\Empira\Data\Grammars\PostgresGrammar;
-use IamAdty\Empira\Data\Query;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
+use IamAdty\Empira\Auth\DoctrineUserProvider;
+use IamAdty\Empira\Auth\User;
+use IamAdty\Empira\Config\Config;
+use IamAdty\Empira\Config\DatabaseConfig;
+use IamAdty\Empira\Persistence\EntityManagerFactory;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The query builder against a real PostgreSQL server.
+ * The persistence layer against a real PostgreSQL server.
  *
- * These are the tests that make the grammar claim true rather than plausible.
- * Everything the builder emits has to be valid PostgreSQL, and the only way to
- * know that is to hand it to PostgreSQL.
+ * These used to hand raw SQL from the framework's own query builder to
+ * PostgreSQL, because the grammar's claim — that every identifier the framework
+ * emits is quoted the way the server wants — is only worth making if a server
+ * agrees with it. That layer is gone; the claim is not.
+ *
+ * What replaced it is a different and larger claim: that Doctrine's schema,
+ * its queries and its migrations work against this server, and that a `User`
+ * written on SQLite is the same object on PostgreSQL. SQLite forgives a great
+ * deal, so a suite that only ever runs on it is a suite that has not been
+ * tested.
  *
  * They are grouped `driver` and skipped when the environment has no server, so
  * a plain `vendor/bin/phpunit` still passes on a machine that has none. The
@@ -27,7 +39,9 @@ use PHPUnit\Framework\TestCase;
 #[Group('driver')]
 final class PostgresTest extends TestCase
 {
-    private ?Connection $connection = null;
+    private const HASH = '$2y$10$Ua89QG/6trEgtY0K1UKd2Ot6.giI.2..iM8F1dZqqW8K9/c/IDEma';
+
+    private ?EntityManagerInterface $entities = null;
 
     protected function setUp(): void
     {
@@ -37,180 +51,157 @@ final class PostgresTest extends TestCase
             $this->markTestSkipped('No PostgreSQL configured; set EMPIRA_TEST_PGSQL_DSN to run the driver tests.');
         }
 
-        $this->connection = new Connection(new \PDO(
-            $dsn,
-            (string) getenv('EMPIRA_TEST_PGSQL_USER'),
-            (string) getenv('EMPIRA_TEST_PGSQL_PASSWORD'),
-        ));
-    }
-
-    private function connection(): Connection
-    {
-        $this->connection?->execute('DROP TABLE IF EXISTS widgets');
-        $this->connection?->execute('DROP TABLE IF EXISTS teams');
-
-        $this->connection->execute('CREATE TABLE widgets (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            team_id INTEGER,
-            price INTEGER
-        )');
-
-        $this->connection->execute(
-            "INSERT INTO widgets (name, team_id, price) VALUES ('alpha', 1, 10), ('beta', 1, 20), ('gamma', 2, 40)"
+        $this->entities = EntityManagerFactory::make(
+            new Config(self::parseDsn($dsn) + [
+                'username' => (string) getenv('EMPIRA_TEST_PGSQL_USER'),
+                'password' => (string) getenv('EMPIRA_TEST_PGSQL_PASSWORD'),
+            ]),
+            [__DIR__ . '/../src/Auth'],
         );
-
-        return $this->connection;
     }
 
-    public function testItSpeaksTheDialectTheServerActuallySpeaks(): void
+    /**
+     * `pgsql:host=…;port=…;dbname=…` into the flat config shape.
+     *
+     * Both of the obvious alternatives are wrong. `DsnParser` returns
+     * `dbname => 'host=…;port=…;dbname=…'` without splitting the parameters, and
+     * DBAL 4 dropped `DriverManager`'s `url` key entirely — so this is the
+     * remaining job, and doing it here keeps the framework's own reader free of
+     * a DSN format only this test's environment uses.
+     *
+     * @return array<string, mixed>
+     */
+    private static function parseDsn(string $dsn): array
     {
-        $connection = $this->connection();
+        $scheme = 'pgsql';
 
-        $this->assertInstanceOf(PostgresGrammar::class, $connection->grammar());
-    }
-
-    public function testAQuotedIdentifierIsAcceptedByPostgres(): void
-    {
-        $connection = $this->connection();
-
-        // Backticks here would be a syntax error on arrival, which is the whole
-        // reason the grammar seam exists.
-        $rows = $connection->fetchAll('SELECT * FROM "widgets" ORDER BY "name"');
-
-        $this->assertSame(['alpha', 'beta', 'gamma'], array_column($rows, 'name'));
-    }
-
-    public function testItRoundTripsThroughTheBuilderOnPostgres(): void
-    {
-        $connection = $this->connection();
-
-        $rows = (new Query($connection))
-            ->get('widgets')
-            ->where('team_id', 1)
-            ->orderBy('price', 'desc')
-            ->fetch();
-
-        $this->assertSame(['beta', 'alpha'], array_column($rows, 'name'));
-    }
-
-    public function testItInsertsAndReadsBackTheGeneratedKey(): void
-    {
-        $connection = $this->connection();
-
-        $inserted = (new Query($connection))
-            ->get('widgets')
-            ->insert(['name' => 'delta', 'team_id' => 3, 'price' => 40]);
-
-        $this->assertSame(1, $inserted->affected());
-
-        $row = (new Query($connection))->get('widgets')->where('id', (int) $connection->lastInsertId())->first();
-
-        $this->assertSame('delta', $row['name']);
-    }
-
-    public function testItJoinsAcrossTables(): void
-    {
-        $connection = $this->connection();
-        $connection->execute('CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
-        $connection->execute("INSERT INTO teams (id, name) VALUES (1, 'red'), (2, 'blue')");
-
-        // Only the joined column is selected: two columns both called `name`
-        // would arrive as a single associative key, because that is how a
-        // duplicate column name behaves on every driver, not a builder defect.
-        $rows = (new Query($connection))
-            ->get('widgets')
-            ->select('teams.name')
-            ->join('teams', 'widgets.team_id', '=', 'teams.id')
-            ->orderBy('teams.name', 'desc')
-            ->fetch();
-
-        $this->assertSame(['red', 'red', 'blue'], array_column($rows, 'name'));
-    }
-
-    public function testALeftJoinKeepsRowsWithNoMatch(): void
-    {
-        $connection = $this->connection();
-        $connection->execute('CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
-        $connection->execute("INSERT INTO teams (id, name) VALUES (1, 'red')");
-
-        // team_id 2 has no team row; an inner join would drop `gamma` entirely.
-        $rows = (new Query($connection))
-            ->get('widgets')
-            ->select('widgets.name')
-            ->leftJoin('teams', 'widgets.team_id', '=', 'teams.id')
-            ->orderBy('widgets.name')
-            ->fetch();
-
-        $this->assertSame(['alpha', 'beta', 'gamma'], array_column($rows, 'name'));
-    }
-
-    public function testItCounts(): void
-    {
-        $connection = $this->connection();
-
-        $rows = (new Query($connection))
-            ->get('widgets')
-            ->select('team_id')
-            ->count()
-            ->groupBy('team_id')
-            ->orderBy('team_id')
-            ->fetch();
-
-        // An int, not a string: the connection turns off STRINGIFY_FETCHES, so
-        // a numeric column arrives with its type intact.
-        $this->assertSame([['team_id' => 1, 'aggregate' => 2], ['team_id' => 2, 'aggregate' => 1]], $rows);
-    }
-
-    public function testItSumsWithAHavingClause(): void
-    {
-        $connection = $this->connection();
-
-        // Team 1 sums to 30 and team 2 to 40, so a threshold of 40 admits
-        // exactly one group — which is what makes this a test of HAVING rather
-        // than of the fixture.
-        $rows = (new Query($connection))
-            ->get('widgets')
-            ->select('team_id')
-            ->sum('price')
-            ->groupBy('team_id')
-            ->having('SUM', 'price', 40, '>=')
-            ->fetch();
-
-        $this->assertSame([['team_id' => 2, 'aggregate' => 40]], $rows);
-    }
-
-    public function testItFiltersWithWhereIn(): void
-    {
-        $connection = $this->connection();
-
-        $rows = (new Query($connection))
-            ->get('widgets')
-            ->whereIn('name', ['alpha', 'gamma'])
-            ->orderBy('name')
-            ->fetch();
-
-        $this->assertSame(['alpha', 'gamma'], array_column($rows, 'name'));
-    }
-
-    public function testItRollsBackAFailedTransaction(): void
-    {
-        $connection = $this->connection();
-
-        try {
-            $connection->transaction(function (Connection $db): void {
-                $db->execute("INSERT INTO widgets (name) VALUES ('doomed')");
-
-                throw new \RuntimeException('changed my mind');
-            });
-
-            $this->fail('The exception should have propagated.');
-        } catch (\RuntimeException $e) {
-            $this->assertSame('changed my mind', $e->getMessage());
+        if (str_contains($dsn, ':')) {
+            [$scheme, $rest] = explode(':', $dsn, 2);
+        } else {
+            $rest = $dsn;
         }
 
-        $rows = $connection->fetchAll('SELECT * FROM "widgets" WHERE "name" = ?', ['doomed']);
+        $config = ['driver' => $scheme];
 
-        $this->assertSame([], $rows);
+        foreach (array_filter(explode(';', $rest), static fn(string $part): bool => $part !== '') as $pair) {
+            [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
+
+            $config[match ($key) {
+                'host' => 'host',
+                'port' => 'port',
+                'dbname' => 'database',
+                default => $key,
+            }] = $key === 'port' ? (int) $value : $value;
+        }
+
+        return $config;
+    }
+
+    /**
+     * A schema built from the mapping, dropped and rebuilt per test.
+     */
+    private function schema(): EntityManagerInterface
+    {
+        $entities = $this->entities;
+        self::assertNotNull($entities);
+
+        $tool = new SchemaTool($entities);
+        $metadata = [$entities->getClassMetadata(User::class)];
+
+        $tool->dropSchema($metadata);
+        $tool->createSchema($metadata);
+
+        return $entities;
+    }
+
+    public function testTheSchemaDoctrineGeneratesIsValidPostgres(): void
+    {
+        // The claim the deleted grammar tests used to make, made against the
+        // server: hand it what the mapping produces and it must accept it.
+        $entities = $this->schema();
+
+        $user = new User('ada@example.com', 'Ada', self::HASH);
+        $entities->persist($user);
+        $entities->flush();
+
+        self::assertNotNull($user->id(), 'a generated key came back');
+    }
+
+    public function testAnIdentityColumnComesBackAsAnInteger(): void
+    {
+        $entities = $this->schema();
+        $users = new DoctrineUserProvider($entities);
+
+        $entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        $entities->flush();
+        $entities->clear();
+
+        // `find()` takes an int here but the interface allows int|string, and a
+        // driver handing back "1" rather than 1 is the kind of difference that
+        // only a real server shows.
+        self::assertSame('Ada', $users->byId('1')?->name());
+    }
+
+    public function testTheJsonColumnRoundTrips(): void
+    {
+        // SQLite has no JSON type and will happily store anything, so a bag that
+        // comes back wrong here means the column type is wrong on one of them.
+        $entities = $this->schema();
+
+        $entities->persist(new User('ada@example.com', 'Ada', self::HASH, ['role' => 'admin', 'seen' => 3]));
+        $entities->flush();
+        $entities->clear();
+
+        $found = $entities->find(User::class, 1);
+
+        self::assertNotNull($found);
+        self::assertSame('admin', $found->attribute('role'));
+        self::assertSame(3, $found->attribute('seen'), 'a JSON integer should not come back a string');
+    }
+
+    public function testTheUniqueIndexIsEnforcedByTheServerNotByTheApplication(): void
+    {
+        $entities = $this->schema();
+
+        $entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        $entities->flush();
+
+        $entities->persist(new User('ada@example.com', 'Someone Else', self::HASH));
+
+        // This is the whole argument for writing through the ORM rather than
+        // checking first: two concurrent registrations both pass a check-then-
+        // write, and only the database stops the second one.
+        //
+        // DBAL's exception, not the ORM's: ORM 3 has no
+        // `EntityUniqueConstraintViolationException`, and a `catch` naming a
+        // class that does not exist never matches — so this would have read as
+        // "no violation happened" and the caller would have seen a 500.
+        $this->expectException(UniqueConstraintViolationException::class);
+
+        $entities->flush();
+    }
+
+    public function testClearingTheManagerReadsThroughToTheServer(): void
+    {
+        $entities = $this->schema();
+        $users = new DoctrineUserProvider($entities);
+
+        $entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        $entities->flush();
+
+        $entities->getConnection()->executeStatement(
+            "UPDATE users SET name = ? WHERE email = ?",
+            ['Ada Lovelace', 'ada@example.com']
+        );
+
+        self::assertSame('Ada', $users->byId(1)?->name(), 'the identity map serves the cached entity');
+
+        $entities->clear();
+
+        self::assertSame(
+            'Ada Lovelace',
+            $users->byId(1)?->name(),
+            'a cleared manager must read through to the server'
+        );
     }
 }

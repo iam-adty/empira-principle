@@ -66,8 +66,7 @@ View           Layout, Region
 Security       Csrf, Registry, TokenCodec
 State          StateStore + implementations, PropBag, ActionMap
 Validation     Validator, ErrorBag
-Data           Connection, Query, Db
-Config         Env, Config
+Config         Env, Config, DatabaseConfig
 Testing        TestClient
 Console        CLI
 ```
@@ -147,23 +146,23 @@ status code, while everything else stays HTML. The rule that makes this safe is
 that **htmx sends no `Accept` header at all**, so a wildcard resolves to HTML —
 see [docs/json-errors.md](docs/json-errors.md).
 
-## Data sits below everything
+## Persistence sits below everything
 
 ```
 Request → middleware → routing → handler
                                  ↓
-                          Db / Query → Connection → PDO → driver
+                    EntityManager → DBAL → PDO → driver
 ```
 
-Nothing above `Db` knows what a database is. A handler asks for `Db` by type and
-the container supplies one, which is what lets a repository — or, later, an
-ORM's model — be an ordinary autowired class with no framework wiring of its own.
+Nothing above the `EntityManager` knows what a database is. A handler asks for
+`EntityManagerInterface` by type and the container supplies one, which is what
+lets a repository be an ordinary autowired class with no framework wiring of its
+own.
 
-The one thing that varies by database is quoted identifiers, and that lives in a
-`Grammar`. Everything else in `Query` is portable, and the validation of what
-counts as an identifier does not vary at all: identifiers cannot be bound by any
-driver, so they travel inside the SQL string, which makes them an injection
-vector. A dialect inherits the check rather than restating it.
+The one thing that varies by database is quoted identifiers, and Doctrine owns
+that now. The framework's hand-written dialect layer — `Grammar`, `Query` and
+friends — is gone; it existed to prove the framework could speak several
+databases, and Doctrine already could.
 
 See [docs/data.md](docs/data.md).
 
