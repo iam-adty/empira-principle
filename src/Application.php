@@ -28,6 +28,8 @@ use IamAdty\Empira\Security\Csrf;
 use IamAdty\Empira\State\NullState;
 use IamAdty\Empira\State\StateStore;
 use IamAdty\Empira\Validation\ValidationException;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * The framework's front door.
@@ -87,6 +89,9 @@ final class Application
     /** @var list<\IamAdty\Empira\Auth\Guard> */
     private array $guards = [];
 
+    /** Where anything the framework has to record goes. Discards, unless told otherwise. */
+    private LoggerInterface $logger;
+
     public function __construct(
         string $secret,
         private readonly StateStore $state = new NullState(),
@@ -102,6 +107,11 @@ final class Application
         $this->container = $container ?? new Container();
         $this->urls = new UrlGenerator($this->routes);
         $this->pipeline = new Pipeline($this->container);
+
+        // A null logger by default so an app that never asked for logging does
+        // not write one — and so no call site needs a null check.
+        $this->logger = new NullLogger();
+        $this->container->instance(LoggerInterface::class, $this->logger);
 
         $this->container->instance(self::class, $this);
         $this->container->instance(Container::class, $this->container);
@@ -210,6 +220,35 @@ final class Application
     public function session(): Session
     {
         return $this->container->get(Session::class);
+    }
+
+    /**
+     * Where the application records what happened.
+     *
+     *     $app->log(new Monolog\Logger('app'));
+     *
+     * PSR-3 rather than an interface of the framework's own, so the logger an
+     * application already has — Monolog, a cloud handler, a test double — is
+     * the logger the framework writes to. Defaults to discarding: a framework
+     * that logs by surprise is a framework nobody trusts in production.
+     *
+     * The logger is also bound as `LoggerInterface` in the container, so a
+     * component or a repository can take it by type the way it takes `Auth`.
+     */
+    public function log(LoggerInterface $logger): self
+    {
+        $this->logger = $logger;
+        $this->container->instance(LoggerInterface::class, $logger);
+
+        return $this;
+    }
+
+    /**
+     * The logger the framework writes to, which is the one the app supplied.
+     */
+    public function logger(): LoggerInterface
+    {
+        return $this->logger;
     }
 
     public function registry(): Registry
@@ -707,6 +746,10 @@ final class Application
     public function renderException(\Throwable $e, Request $request, Response $response): Response
     {
         if ($this->errorHandler !== null) {
+            // An application that renders the exception still wants it recorded:
+            // a tidy page is a response, not a diagnosis.
+            $this->logFailure($e, $request);
+
             return ($this->errorHandler)($e, $request, $response);
         }
 
@@ -721,6 +764,12 @@ final class Application
         };
 
         if ($status === 500 && !$e instanceof HttpException && !$e instanceof ValidationException) {
+            // Logged before it is re-thrown, because the re-throw is what sends
+            // it to the server's error output — and that is off by default in
+            // most PHP configurations, so the one thing a developer most needs
+            // to see is the one thing that was being lost.
+            $this->logFailure($e, $request);
+
             throw $e;
         }
 
@@ -747,6 +796,30 @@ final class Application
         }
 
         return $this->errorResponse($status, $e->getMessage(), $headers, $errors);
+    }
+
+    /**
+     * Record an exception that ended a request, with enough about the request
+     * to reproduce it.
+     *
+     * The method and path are in the context rather than the message so that a
+     * structured handler can index them, and the whole thing is guarded: a
+     * logger that throws while being asked to report a failure would replace a
+     * 500 with a different 500 and lose the original.
+     *
+     * @internal
+     */
+    private function logFailure(\Throwable $e, Request $request): void
+    {
+        try {
+            $this->logger->error($e->getMessage(), [
+                'exception' => $e,
+                'method' => $request->method,
+                'path' => $request->path(),
+            ]);
+        } catch (\Throwable) {
+            // Nothing sensible to do here, and saying so would be recursive.
+        }
     }
 
     /**

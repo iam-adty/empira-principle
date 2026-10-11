@@ -108,9 +108,9 @@ $users->verifyPassword($user, 'correct horse');
 $users->hash('correct horse');                     // to store one
 ```
 
-`password_hash` and `password_verify` are PHP's own, so this stays
-zero-dependency. A user with no stored hash fails to authenticate — a missing
-column must not read as "any password works".
+`password_hash` and `password_verify` are PHP's own, so no dependency stands
+between a password and a secure hash. A user with no stored hash fails to
+authenticate — a missing column must not read as "any password works".
 
 The hash never leaves the provider: `User` is built with `password_hash`
 removed, so a controller cannot log it by accident.

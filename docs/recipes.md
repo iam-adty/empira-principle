@@ -258,6 +258,38 @@ foreach ($app->session()->flashed() as $message) { … }
 
 ---
 
+## Record what happened
+
+The framework logs through [PSR-3](https://www.php-fig.org/psr/psr-3/), not
+through an interface of its own. Hand it one during boot:
+
+```php
+$app->log(new Monolog\Logger('app'));
+```
+
+and anything else — a component action, a repository — can ask for the same one
+by type, the way it asks for `Auth`:
+
+```php
+public function register(Auth $auth, LoggerInterface $log): void
+{
+    $log->info('registration', ['email' => $email]);
+}
+```
+
+Until you hand one over, everything is discarded. That default is the point: a
+framework that starts writing to a file nobody configured is a framework nobody
+trusts in production.
+
+The framework itself logs one thing: **an exception that ended a request**. A
+bug is re-thrown rather than dressed up as a tidy 500, and the re-throw goes
+wherever PHP has been told to put errors — which is nowhere, by default, in most
+production configurations. So the exception is recorded *before* it is re-thrown,
+with the method and path attached, and a 404 or a validation failure is not
+recorded at all, because a client making a mistake is not an incident.
+
+---
+
 ## Verify before you commit
 
 ```bash

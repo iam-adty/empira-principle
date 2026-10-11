@@ -4,243 +4,204 @@ declare(strict_types=1);
 
 namespace IamAdty\Empira\Tests;
 
-use DateTimeImmutable;
-use IamAdty\Empira\Logging\FileLogger;
-use IamAdty\Empira\Logging\Logger;
-use IamAdty\Empira\Logging\LogLevel;
-use IamAdty\Empira\Logging\NullLogger;
+use IamAdty\Empira\Application;
+use IamAdty\Empira\Http\Request;
+use IamAdty\Empira\Http\Response;
+use IamAdty\Empira\Tests\Fixtures\MemoryStore;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
+use Psr\Log\NullLogger;
 
+/**
+ * Logging: PSR-3 all the way down.
+ *
+ * The framework used to own a `Logger` interface, a `LogLevel` enum and a
+ * `FileLogger`. It owns none of that now — it depends on PSR-3 instead, so the
+ * logger an application already has is the logger the framework writes to.
+ *
+ * What is left to test is the wiring: that an application can hand one over,
+ * that components can ask for it by type, and — the part that was actually
+ * missing — that an exception ending a request is recorded rather than thrown
+ * into a void.
+ */
 final class LoggingTest extends TestCase
 {
-    public function testItWritesOneLinePerEntry(): void
+    private const SECRET = 'test-secret-that-is-long-enough-for-hmac!!';
+
+    // -------------------------------------------------------- the logger itself
+
+    public function testTheLoggerIsPsr3AndNotTheFrameworksOwnInterface(): void
     {
-        $path = Temp::file('empira-log');
+        // The whole point of the dependency: anything implementing PSR-3 works,
+        // with no adapter and no base class to extend.
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string, context: array}> */
+            public array $entries = [];
 
-        $this->assertIsString($path);
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->entries[] = ['level' => $level, 'message' => $message, 'context' => $context];
+            }
+        };
 
-        try {
-            $logger = new FileLogger($path);
+        self::assertInstanceOf(LoggerInterface::class, $logger);
 
-            $logger->error('Checkout failed');
-            $logger->info('Serving home');
+        $app = new Application(self::SECRET, new MemoryStore());
+        $app->log($logger);
 
-            $lines = self::lines($path);
+        $app->logger()->info('hello', ['a' => 1]);
 
-            $this->assertCount(2, $lines);
-            $this->assertMatchesEntry('ERROR', 'Checkout failed', $lines[0]);
-            $this->assertMatchesEntry('INFO', 'Serving home', $lines[1]);
-        } finally {
-            unlink($path);
-        }
+        self::assertCount(1, $logger->entries);
+        self::assertSame('hello', $logger->entries[0]['message']);
+        self::assertSame(['a' => 1], $logger->entries[0]['context']);
     }
 
-    public function testItAppendsJsonEncodedContext(): void
-    {
-        $path = Temp::file('empira-log');
-
-        $this->assertIsString($path);
-
-        try {
-            $logger = new FileLogger($path);
-
-            $logger->error('Checkout failed', ['order' => 42, 'why' => 'declined "card"']);
-
-            $lines = self::lines($path);
-
-            $this->assertCount(1, $lines);
-            $this->assertStringEndsWith(' {"order":42,"why":"declined \"card\""}', $lines[0]);
-        } finally {
-            unlink($path);
-        }
-    }
-
-    public function testItLeavesTheContextOffWhenThereIsNone(): void
-    {
-        $path = Temp::file('empira-log');
-
-        $this->assertIsString($path);
-
-        try {
-            $logger = new FileLogger($path);
-
-            $logger->info('no context here', []);
-
-            $this->assertCount(1, self::lines($path));
-            $this->assertStringEndsWith('INFO: no context here', self::lines($path)[0]);
-        } finally {
-            unlink($path);
-        }
-    }
-
-    public function testItLeavesTheContextOffWhenDisabled(): void
-    {
-        $path = Temp::file('empira-log');
-
-        $this->assertIsString($path);
-
-        try {
-            $logger = new FileLogger($path, LogLevel::Debug, false);
-
-            $logger->error('Checkout failed', ['order' => 42]);
-
-            $this->assertStringEndsWith('ERROR: Checkout failed', self::lines($path)[0]);
-        } finally {
-            unlink($path);
-        }
-    }
-
-    public function testItSkipsMessagesBelowTheMinimumLevel(): void
-    {
-        $path = Temp::file('empira-log');
-
-        $this->assertIsString($path);
-
-        try {
-            $logger = new FileLogger($path, LogLevel::Warning);
-
-            $logger->debug('noisy');
-            $logger->info('noisy');
-            $logger->log(LogLevel::Notice, 'noisy');
-            $logger->warning('careful');
-            $logger->error('broken');
-
-            $lines = self::lines($path);
-
-            $this->assertCount(2, $lines);
-            $this->assertMatchesEntry('WARNING', 'careful', $lines[0]);
-            $this->assertMatchesEntry('ERROR', 'broken', $lines[1]);
-        } finally {
-            unlink($path);
-        }
-    }
-
-    public function testAMessageWithANewlineCannotForgeASecondEntry(): void
-    {
-        $path = Temp::file('empira-log');
-
-        $this->assertIsString($path);
-
-        try {
-            $logger = new FileLogger($path);
-
-            $logger->error("Checkout failed\n[2026-01-02 03:04:05] ERROR: nothing happened", ['order' => 42]);
-
-            $lines = self::lines($path);
-
-            $this->assertCount(1, $lines);
-            $this->assertStringContainsString('Checkout failed\n[2026-01-02', $lines[0]);
-            $this->assertStringEndsWith('{"order":42}', $lines[0]);
-        } finally {
-            unlink($path);
-        }
-    }
-
-    public function testItCreatesMissingParentDirectories(): void
-    {
-        $directory = Temp::dir('empira-log-');
-        $path = $directory . '/nested/app.log';
-
-        try {
-            $logger = new FileLogger($path);
-
-            $logger->info('Created the directory');
-
-            $this->assertFileExists($path);
-            $this->assertMatchesEntry('INFO', 'Created the directory', self::lines($path)[0]);
-        } finally {
-            Temp::remove($path);
-            Temp::remove($directory);
-        }
-    }
-
-    public function testAFailedWriteIsSwallowed(): void
-    {
-        $blocker = Temp::file('empira-log');
-
-        $this->assertIsString($blocker);
-
-        try {
-            // A file, not a directory, sits where the log directory would go.
-            $logger = new FileLogger($blocker . '/log/app.log');
-
-            $logger->error('This cannot be written anywhere');
-
-            $this->assertFileDoesNotExist($blocker . '/log/app.log');
-        } finally {
-            unlink($blocker);
-        }
-    }
-
-    public function testNullLoggerDiscardsEverything(): void
+    public function testLogIsChainableAndLoggerReturnsWhatWasGiven(): void
     {
         $logger = new NullLogger();
+        $app = new Application(self::SECRET, new MemoryStore());
 
-        $this->assertInstanceOf(Logger::class, $logger);
-
-        $logger->debug('nothing');
-        $logger->info('nothing');
-        $logger->warning('nothing');
-        $logger->error('nothing');
-        $logger->log(LogLevel::Emergency, 'nothing', ['a' => 1]);
+        self::assertSame($app, $app->log($logger));
+        self::assertSame($logger, $app->logger());
     }
 
-    public function testFromNameIgnoresCaseAndRejectsUnknownLevels(): void
+    public function testNothingIsLoggedUntilTheApplicationSuppliesALogger(): void
     {
-        $this->assertSame(LogLevel::Warning, LogLevel::fromName('warning'));
-        $this->assertSame(LogLevel::Warning, LogLevel::fromName('WARNING'));
-        $this->assertSame(LogLevel::Warning, LogLevel::fromName('WaRnInG'));
-        $this->assertSame(LogLevel::Emergency, LogLevel::fromName('Emergency'));
+        // A framework that logs by surprise is a framework nobody trusts in
+        // production, so the default has to discard rather than reach for a
+        // file nobody configured.
+        $app = new Application(self::SECRET, new MemoryStore());
 
-        $this->assertNull(LogLevel::fromName('verbose'));
-        $this->assertNull(LogLevel::fromName(' warning'));
-        $this->assertNull(LogLevel::fromName(''));
+        self::assertInstanceOf(NullLogger::class, $app->logger());
     }
 
-    public function testSeverityRanksEmergencyMostSevereAndDebugLeast(): void
+    public function testTheLoggerIsBoundInTheContainerForComponentsToAskForByType(): void
     {
-        $this->assertSame('ERROR', LogLevel::Error->label());
-        $this->assertSame('DEBUG', LogLevel::Debug->label());
+        $app = new Application(self::SECRET, new MemoryStore());
 
-        $ordered = LogLevel::cases();
-        usort($ordered, static fn (LogLevel $a, LogLevel $b): int => $a->severity() <=> $b->severity());
+        // Before the application says anything: still answerable, and answering
+        // matters — a component asking for `LoggerInterface` must not blow up.
+        self::assertInstanceOf(LoggerInterface::class, $app->container()->get(LoggerInterface::class));
 
-        $this->assertSame(LogLevel::Emergency, $ordered[0]);
-        $this->assertSame(LogLevel::Alert, $ordered[1]);
-        $this->assertSame(LogLevel::Critical, $ordered[2]);
-        $this->assertSame(LogLevel::Error, $ordered[3]);
-        $this->assertSame(LogLevel::Warning, $ordered[4]);
-        $this->assertSame(LogLevel::Notice, $ordered[5]);
-        $this->assertSame(LogLevel::Info, $ordered[6]);
-        $this->assertSame(LogLevel::Debug, $ordered[7]);
+        $logger = new NullLogger();
+        $app->log($logger);
 
-        $this->assertTrue(LogLevel::Emergency->severity() < LogLevel::Debug->severity());
-        $this->assertCount(8, array_unique(array_map(static fn (LogLevel $level): int => $level->severity(), LogLevel::cases())));
+        self::assertSame($logger, $app->container()->get(LoggerInterface::class));
+    }
+
+    // ------------------------------------------- exceptions are recorded, not lost
+
+    public function testAGenuineBugIsLoggedBeforeItIsRethrown(): void
+    {
+        $app = new Application(self::SECRET, new MemoryStore());
+        $logger = self::recordingLogger();
+        $app->log($logger);
+
+        // A bug is re-thrown by design — it should fail loudly rather than be
+        // dressed up as a tidy 500. The point is that being loud now means a
+        // log line, because the re-throw's own output is off by default.
+        $app->fallback(function (): string {
+            throw new \LogicException('a real bug');
+        });
+
+        try {
+            $app->handle(new Request('GET', '/boom'));
+            self::fail('the exception should have been re-thrown');
+        } catch (\LogicException) {
+            // expected
+        }
+
+        self::assertCount(1, $logger->entries);
+
+        [$entry] = $logger->entries;
+
+        self::assertSame(LogLevel::ERROR, $entry['level']);
+        self::assertSame('a real bug', $entry['message']);
+        self::assertSame('GET', $entry['context']['method']);
+        self::assertSame('/boom', $entry['context']['path']);
+        self::assertInstanceOf(\LogicException::class, $entry['context']['exception']);
+    }
+
+    public function testAnExceptionAnApplicationRendersItselfIsStillLogged(): void
+    {
+        $app = new Application(self::SECRET, new MemoryStore());
+        $logger = self::recordingLogger();
+        $app->log($logger);
+
+        // Rendering an exception is a response, not a diagnosis. Without this
+        // the one branch that swallows the throwback would also swallow the
+        // only record of it.
+        $app->onException(static fn(\Throwable $e): Response => Response::html('sorry', 500));
+
+        $app->fallback(function (): string {
+            throw new \LogicException('handled, but worth knowing');
+        });
+
+        $response = $app->handle(new Request('GET', '/oops'));
+
+        self::assertSame(500, $response->status());
+        self::assertCount(1, $logger->entries);
+        self::assertSame('handled, but worth knowing', $logger->entries[0]['message']);
+    }
+
+    public function testAClientErrorIsNotLoggedAsAFailure(): void
+    {
+        $app = new Application(self::SECRET, new MemoryStore());
+        $logger = self::recordingLogger();
+        $app->log($logger);
+
+        // A 404 is the client's doing and is not an incident. Logging every one
+        // of them buries the 500s in routine noise.
+        $app->fallback(function (): string {
+            throw new \IamAdty\Empira\Routing\HttpException(404, 'not here');
+        });
+
+        $response = $app->handle(new Request('GET', '/missing'));
+
+        self::assertSame(404, $response->status());
+        self::assertSame([], $logger->entries);
+    }
+
+    public function testALoggerThatThrowsDoesNotTakeTheRequestDownWithIt(): void
+    {
+        $app = new Application(self::SECRET, new MemoryStore());
+
+        // A logger failing must not replace a 500 with a different 500 and
+        // lose the original — the whole reason `logFailure` swallows.
+        $app->log(new class extends AbstractLogger {
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                throw new \RuntimeException('the disk is full');
+            }
+        });
+
+        $app->fallback(function (): string {
+            throw new \LogicException('a real bug');
+        });
+
+        try {
+            $app->handle(new Request('GET', '/boom'));
+            self::fail('the original exception should still have been re-thrown');
+        } catch (\LogicException $e) {
+            self::assertSame('a real bug', $e->getMessage());
+        }
     }
 
     /**
-     * The non-empty lines of a log file.
-     *
-     * @return list<string>
+     * Records what it was asked to write, so a test can assert on it.
      */
-    private static function lines(string $path): array
+    private static function recordingLogger(): AbstractLogger
     {
-        $contents = (string) file_get_contents($path);
+        return new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
+            public array $entries = [];
 
-        return array_values(array_filter(
-            explode("\n", $contents),
-            static fn (string $line): bool => $line !== ''
-        ));
-    }
-
-    private static function assertMatchesEntry(string $label, string $message, string $line): void
-    {
-        $matched = preg_match('/^\[(?<timestamp>[^\]]+)\] ' . $label . ': ' . preg_quote($message, '/') . '$/', $line, $matches);
-
-        self::assertSame(1, $matched, 'Unexpected log line: ' . $line);
-        self::assertNotFalse(
-            DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $matches['timestamp']),
-            'Unparseable timestamp: ' . $matches['timestamp']
-        );
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->entries[] = ['level' => $level, 'message' => $message, 'context' => $context];
+            }
+        };
     }
 }

@@ -68,7 +68,6 @@ State          StateStore + implementations, PropBag, ActionMap
 Validation     Validator, ErrorBag
 Data           Connection, Query, Db
 Config         Env, Config
-Logging        Logger, FileLogger, NullLogger
 Testing        TestClient
 Console        CLI
 ```

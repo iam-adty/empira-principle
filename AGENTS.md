@@ -1,13 +1,15 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `790 tests, 1451 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `787 tests, 1423 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
 
 ## What this is
 
-A zero-dependency PHP framework where **htmx lives in PHP classes, not HTML attributes**. A component declares its state as a typed property and its behaviour as methods; the framework generates every `hx-*` attribute, the swap target, and a signed endpoint.
+A PHP framework where **htmx lives in PHP classes, not HTML attributes**. A component declares its state as a typed property and its behaviour as methods; the framework generates every `hx-*` attribute, the swap target, and a signed endpoint.
+
+It is not dependency-free, and no longer tries to be. The framework depends on `psr/log` and will depend on Doctrine: a dependency chosen deliberately for the boring, standardised things is worth more than a hand-rolled one that only this framework understands. What stays hand-written is the part that is the framework's actual subject — components, routing, views, and the htmx wiring.
 
 ```
 namespace IamAdty\Empira;     PHP ^8.4, MIT
@@ -64,11 +66,12 @@ printed. That check is why `composer test` means what it says — read
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
 | `src/Data/` | `Connection`, `Query`, `Db`, `Grammar` + dialects, `Migrator`, `ConnectionFactory` |
 | `src/Config/` | `.env` parsing, dot-notation config |
-| `src/Logging/` | `Logger`, `FileLogger`, `NullLogger`, `LogLevel` |
 | `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth` |
 | `src/Security/Csrf.php` | Session-backed CSRF for component actions |
 | `src/Testing/` | `TestClient`, `TestResponse` |
 | `src/Console/` | CLI kernel and commands |
+
+Logging has no directory of its own: the framework asks for a `Psr\Log\LoggerInterface` and supplies none unless the application hands one over with `$app->log()`. `Psr\Log\NullLogger` is the default, so a framework that logs by surprise never happens.
 
 ## Non-negotiable invariants
 
