@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **475 framework tests / 1081 assertions**, **27 app tests / 85 assertions**.
+Current: **475 framework tests / 1081 assertions**, **30 app tests / 89 assertions**.
 
 ---
 
@@ -43,11 +43,17 @@ Current: **475 framework tests / 1081 assertions**, **27 app tests / 85 assertio
 ### Support
 - ~~Autowiring container with cycle detection~~
 - ~~Validation: 15 rules, error bag, no coercion~~
-- ~~Logging: levels, file logger, newline-safe~~
-- ~~Data: PDO query builder with strict identifier validation~~
+- ~~Logging: PSR-3, with a Monolog implementation in the application~~ — was
+  a hand-rolled `Logger`/`LogLevel`/`FileLogger`, removed 2026-10-12 in favour
+  of `psr/log` so the logger an application already has is the one the framework
+  writes to. The framework records an exception that ends a request, before
+  re-throwing it; it did not record anything at all before.
+- ~~Persistence: Doctrine ORM + DBAL + Migrations~~ — replaced a hand-written
+  PDO query builder, dialect layer and migrator (1433 lines, gone). One reader
+  for `DB_*`, a real version ledger, and `empira migrate`/`--status`/`--step=down`.
 - ~~Config: `.env` parsing, dot-notation, typed getters~~
 - ~~`TestClient` for application authors~~
-- ~~CLI: `make:component`, `make:controller`, `route:list`, `serve`~~
+- ~~CLI: `make:component`, `make:controller`, `route:list`, `serve`, `migrate`~~
 
 ### Packaging — 2026-10-11
 - ~~Split into two Composer packages: `principle/` (library) and `app/` (project)~~
@@ -85,10 +91,37 @@ Current: **475 framework tests / 1081 assertions**, **27 app tests / 85 assertio
 
 ### Long-running workers — 2026-10-11
 - ~~`Session::beginRequest()` resets between requests; five tests fail without it~~
-- ~~`Response::emit()` — a non-exiting send, so a worker survives more than one request~~
+- ~~`Application::respond()` — a non-exiting send, so a worker survives more than one request~~
 - ~~The context is cleared in a `finally`~~
-- ~~The connection's statement log is cleared per request~~
+- ~~The EntityManager's identity map is cleared per request~~ — was the
+  connection's statement log, which went with the data layer; same trap, same
+  place it is handled now
 - ~~The shared-store rule: worker memory holds only re-derivable data~~
+
+### Doctrine — 2026-10-12
+The framework took its first runtime dependencies and gave up the
+zero-dependency claim, which is no longer true and is not papered over. Doctrine
+was chosen for the standardised parts; components, routing, views and the htmx
+wiring are still the framework's own.
+
+- ~~`psr/log` — the framework asks for PSR-3 and supplies no logger unless the
+  application hands one over~~
+- ~~`Config\DatabaseConfig` — one reader for `DB_*`; two readers with different
+  defaults had `empira migrate` reporting success against a database that
+  vanished on exit~~
+- ~~`Console\Bootstrap` — an application registers its own commands; the console
+  finds them by running `bootstrap/app.php`~~
+- ~~`Persistence\EntityManagerFactory` — `orm()`, and a `clear()` beside
+  `Session::beginRequest()`~~
+- ~~`Auth\User` is an entity, `DoctrineUserProvider` reads it~~
+- ~~`src/Data/` deleted — 1433 lines the ORM had already replaced~~
+
+### Operations — 2026-10-12
+- ~~Migrations and seeding are deploy steps — `empira migrate`, `empira seed` —
+  because a worker boots once per thread and a boot that migrates has every
+  thread racing through the same migration~~
+- ~~The application refuses to start on the placeholder `APP_SECRET` outside a
+  local environment~~
 
 ---
 
