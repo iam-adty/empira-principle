@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace IamAdty\Empira;
 
 use IamAdty\Empira\Config\Config;
+use IamAdty\Empira\Auth\Auth;
+use IamAdty\Empira\Auth\Guard;
 use IamAdty\Empira\Container\Container;
 use IamAdty\Empira\Data\Connection;
 use IamAdty\Empira\Data\ConnectionFactory;
@@ -82,6 +84,9 @@ final class Application
 
     private ?\IamAdty\Empira\Data\Db $db = null;
 
+    /** @var list<\IamAdty\Empira\Auth\Guard> */
+    private array $guards = [];
+
     public function __construct(
         string $secret,
         private readonly StateStore $state = new NullState(),
@@ -111,6 +116,39 @@ final class Application
         }
 
         $this->container->singleton(Session::class, static fn(Container $container): Session => new Session());
+    }
+
+    /**
+     * Wire authentication.
+     *
+     *     $app->auth(
+     *         new SessionGuard($session, $users),
+     *         new BearerGuard($users->byApiToken(...)),
+     *     );
+     *
+     * An `Auth` is then built and bound **per request**, not once at boot. That
+     * is deliberate: a singleton would need resetting before every dispatch,
+     * and a reset someone forgets is a request that runs as the user before
+     * it. A fresh instance cannot remember the request before it, so there is
+     * nothing to forget.
+     *
+     * Guards are consulted in order and the first user wins.
+     */
+    public function auth(Guard ...$guards): self
+    {
+        $this->guards = array_values($guards);
+
+        return $this;
+    }
+
+    /**
+     * The authentication guards, whether or not any have been registered.
+     *
+     * @return list<Guard>
+     */
+    public function guards(): array
+    {
+        return $this->guards;
     }
 
     /**
@@ -287,6 +325,9 @@ final class Application
         $this->container->instance(Context::class, $context);
         $this->container->instance(Format::class, $this->format);
         $this->container->instance(RouteParams::class, $this->params);
+
+        // Per request, not per application: see auth().
+        $this->container->instance(Auth::class, new Auth($this->guards, $request));
 
         try {
             return $this->pipeline->send(

@@ -22,7 +22,7 @@ namespace IamAdty\Empira\Http;
  * start, so an in-process array stands in. Requests share it for the life of the
  * process, which is exactly the behaviour a test wants.
  */
-final class Session
+final class Session implements SessionId
 {
     private const FLASH_NEXT = '_flash_next';
     private const FLASH_CURRENT = '_flash';

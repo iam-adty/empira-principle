@@ -43,8 +43,22 @@ final class Route
         public readonly array $defaults = [],
         public readonly array $middleware = [],
         public readonly ?int $priority = null,
+        public readonly bool $csrf = true,
     ) {
         $this->verbs = $method === '*' ? Verb::cases() : [Verb::from(strtoupper($method)) ?? Verb::Get];
+    }
+
+    /**
+     * Does this route want its state-changing requests checked for CSRF?
+     *
+     * False is a deliberate, per-route statement that the request does not
+     * rely on an ambient credential. It is read by the CSRF middleware itself
+     * rather than by a route middleware, because that middleware runs outside
+     * this one.
+     */
+    public function verifiesCsrf(): bool
+    {
+        return $this->csrf;
     }
 
     /**

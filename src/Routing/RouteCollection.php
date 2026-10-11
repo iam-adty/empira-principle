@@ -40,29 +40,29 @@ final class RouteCollection
     /** @var list<class-string|callable> */
     private array $groupMiddleware = [];
 
-    public function get(string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
+    public function get(string $pattern, mixed $handler, ?string $name = null, array $defaults = [], bool $csrf = true): Route
     {
-        return $this->add('GET', $pattern, $handler, $name, $defaults);
+        return $this->add('GET', $pattern, $handler, $name, $defaults, csrf: $csrf);
     }
 
-    public function post(string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
+    public function post(string $pattern, mixed $handler, ?string $name = null, array $defaults = [], bool $csrf = true): Route
     {
-        return $this->add('POST', $pattern, $handler, $name, $defaults);
+        return $this->add('POST', $pattern, $handler, $name, $defaults, csrf: $csrf);
     }
 
-    public function put(string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
+    public function put(string $pattern, mixed $handler, ?string $name = null, array $defaults = [], bool $csrf = true): Route
     {
-        return $this->add('PUT', $pattern, $handler, $name, $defaults);
+        return $this->add('PUT', $pattern, $handler, $name, $defaults, csrf: $csrf);
     }
 
-    public function patch(string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
+    public function patch(string $pattern, mixed $handler, ?string $name = null, array $defaults = [], bool $csrf = true): Route
     {
-        return $this->add('PATCH', $pattern, $handler, $name, $defaults);
+        return $this->add('PATCH', $pattern, $handler, $name, $defaults, csrf: $csrf);
     }
 
-    public function delete(string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
+    public function delete(string $pattern, mixed $handler, ?string $name = null, array $defaults = [], bool $csrf = true): Route
     {
-        return $this->add('DELETE', $pattern, $handler, $name, $defaults);
+        return $this->add('DELETE', $pattern, $handler, $name, $defaults, csrf: $csrf);
     }
 
     /**
@@ -70,9 +70,9 @@ final class RouteCollection
      *
      * @param array<string, mixed> $defaults
      */
-    public function any(string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
+    public function any(string $pattern, mixed $handler, ?string $name = null, array $defaults = [], bool $csrf = true): Route
     {
-        return $this->add('*', $pattern, $handler, $name, $defaults);
+        return $this->add('*', $pattern, $handler, $name, $defaults, csrf: $csrf);
     }
 
     /**
@@ -80,8 +80,14 @@ final class RouteCollection
      *
      * @param array<string, mixed> $defaults
      */
-    public function add(string $method, string $pattern, mixed $handler, ?string $name = null, array $defaults = []): Route
-    {
+    public function add(
+        string $method,
+        string $pattern,
+        mixed $handler,
+        ?string $name = null,
+        array $defaults = [],
+        bool $csrf = true,
+    ): Route {
         return $this->register(new Route(
             method: strtoupper($method),
             pattern: $this->prefix . '/' . ltrim($pattern, '/'),
@@ -89,6 +95,7 @@ final class RouteCollection
             name: $name,
             defaults: array_merge($this->groupDefaults, $defaults),
             middleware: $this->groupMiddleware,
+            csrf: $csrf,
         ));
     }
 
@@ -121,6 +128,7 @@ final class RouteCollection
                 name: $attribute->name ?? $derivedName,
                 middleware: $attribute->middleware,
                 priority: $attribute->priority,
+                csrf: $attribute->csrf,
             );
         }
     }

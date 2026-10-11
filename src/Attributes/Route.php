@@ -46,6 +46,7 @@ final class Route
         public readonly ?string $name = null,
         public readonly array $middleware = [],
         public readonly ?int $priority = null,
+        public readonly bool $csrf = true,
     ) {
     }
 
