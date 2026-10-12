@@ -119,6 +119,38 @@ application rather than only its commands, and `bin/empira` hands it to the
 console, which hands it to `migrate`. **Anything else driving the console has to
 do the same**, or it will migrate a schema missing every table the modules own.
 
+## What a module is, in Composer terms
+
+The contracts above are what a module implements in PHP. This is what it is in
+`composer.json`, and the distinction is not bookkeeping — it is the same cut,
+drawn in the place where dependency direction is actually enforced.
+
+| | `type` | Requires |
+|---|---|---|
+| `iam-adty/empira-principle` | `library` | nothing |
+| a module, e.g. `iam-adty/empira-auth` | `library` | `empira-principle` |
+| an application | `project` | `empira-principle` + the modules it installs |
+
+A module is a **library** and requires the framework. An application is a
+**project** and requires its modules. Neither fact is cosmetic:
+
+- A library is something other packages may depend on, so its own dependencies are
+  its business and its `composer.lock` is not committed — what it resolves to is
+  its consumers' decision.
+- A project is the thing that closes the set. Its lock is committed, because a
+  deployed application is not reproducible otherwise.
+
+If a module were `type: project`, Composer would treat it as an application root
+and consumers could not require it as a dependency at all. The failure is a
+resolution error at install time, which is at least an honest one — much better
+than the framework depending on a feature, which nothing catches until the
+dependency is already the wrong way round.
+
+`dev/tools/module-contract` checks this across every package in the workspace, and
+lives in `dev` rather than here on purpose: enforcing it needs to see every
+package at once, and a test in `principle` that reached into `../auth` would be the
+inward dependency this document exists to argue against — dressed as a test.
+
 ## What a module may not do
 
 **Name a framework internal.** Core does not know its classes and must not depend
