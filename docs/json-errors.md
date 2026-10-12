@@ -1,7 +1,7 @@
 # JSON errors
 
 > **Status: describes shipped code.** Negotiated errors, one envelope, and the
-> `ValidationException` fix. Source of truth: [../../dev/planning/SPEC.md](../../dev/planning/SPEC.md) §2.
+> `ValidationException` fix. Source of truth: [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../) §2.
 
 The goal: a non-browser client gets a JSON body, and one error shape, without the
 route having to declare that it is an API.
@@ -159,4 +159,4 @@ authentication.
 ---
 
 **See also** [http.md](http.md) for the request/response surface, and
-[../../dev/planning/SPEC.md](../../dev/planning/SPEC.md) §2 for the reasoning.
+[SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../) §2 for the reasoning.

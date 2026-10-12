@@ -126,7 +126,7 @@ can change without a major bump, though changes are always documented here.
 - One JSON error envelope, `{"error": {status, message, errors?}}`, for every
   failure when the client explicitly asks for JSON. HTML is unchanged.
 - `VerifyCsrfToken` now refuses in the negotiated format.
-- Documentation set: `AGENTS.md`, `ARCHITECTURE.md`, `../dev/planning/SPEC.md`, `../dev/planning/CHECKLIST.md`,
+- Documentation set: `AGENTS.md`, `ARCHITECTURE.md`, [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md), [CHECKLIST.md](https://github.com/iam-adty/empira-dev/blob/main/planning/CHECKLIST.md),
   `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` and a `docs/` reference.
 
 ### Changed
@@ -330,7 +330,7 @@ working tree. It has not been tagged or published.
 True and unfixed at this point:
 
 - Routing is first-match-wins with no specificity sort, so `/todos/new` must be
-  declared before `/todos/{id}`. Scheduled in `../dev/planning/SPEC.md`.
+  declared before `/todos/{id}`. Scheduled in [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md).
 - JSON **errors** are negotiated, but a response is only JSON when a handler
   returns `Response::json()`. There is no route-level format declaration.
 - No authentication. See `SECURITY.md`.

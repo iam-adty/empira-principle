@@ -206,4 +206,4 @@ protected function setUp(): void
 ## Further reading
 
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — the full pre-commit checklist
-- [AGENTS.md](../../dev/agents/principle.md) — known traps
+- [AGENTS.md](https://github.com/iam-adty/empira-dev/blob/main/AGENTS.md../) — known traps

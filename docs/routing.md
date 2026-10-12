@@ -342,4 +342,4 @@ how a project registers its routes by hand.
 ## Further reading
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — where routing sits in the request
-- [../../dev/planning/SPEC.md](../../dev/planning/SPEC.md) — planned work
+- [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../) — planned work

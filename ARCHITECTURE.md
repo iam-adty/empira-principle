@@ -1,7 +1,7 @@
 # Architecture
 
 > **Status: describes shipped code.** Verified against `473 tests, 1071 assertions`.
-> Planned changes are in [../dev/planning/SPEC.md](../dev/planning/SPEC.md).
+> Planned changes are in [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../).
 
 How a request flows through Empira, and why it is built this way.
 
@@ -208,5 +208,5 @@ $client->asHtmx()->post('/empira/<token>/add', ['title' => 'walk dog'])->assertS
 
 ## Further reading
 
-- [AGENTS.md](../dev/agents/principle.md) — conventions, invariants, known traps
-- [../dev/planning/SPEC.md](../dev/planning/SPEC.md) — planned work with its rationale
+- [AGENTS.md](https://github.com/iam-adty/empira-dev/blob/main/AGENTS.md../) — conventions, invariants, known traps
+- [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../) — planned work with its rationale

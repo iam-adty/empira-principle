@@ -91,12 +91,21 @@ final class Temp
     }
 
     /**
-     * The workspace `tmp/`, created if it is not there.
+     * The scratch `tmp/`, created if it is not there.
      *
-     * Two levels up, because the shared folder sits above the package: `tests/`
-     * → the package root → the workspace. That is also what makes it resolve
-     * unchanged inside the container, where the workspace is mounted at
-     * `/workspace` and this file is at `/workspace/principle/tests/Temp.php`.
+     * Two levels up: `tests/` → the package root → its parent. In the workspace
+     * that parent is shared by all the packages, so a failing run leaves its
+     * database somewhere you would think to look — which is the only reason the
+     * path is up there rather than inside this package.
+     *
+     * It resolves the same inside the container, where the workspace is mounted
+     * at `/workspace` and this file is at `/workspace/principle/tests/Temp.php`.
+     *
+     * **A clone of this package alone writes `tmp/` next to itself**, one
+     * directory above wherever it was cloned. That is untidy but harmless, and it
+     * is the reason this creates the directory rather than assuming one: a
+     * package that could not create it would fail on a host with no sibling
+     * checkout at all.
      */
     public static function root(): string
     {

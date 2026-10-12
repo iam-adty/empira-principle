@@ -329,4 +329,4 @@ sheet — which is right, because anything fetched alone has to stand alone.
 
 - [SECURITY.md](../SECURITY.md) — the token model in full
 - [../docs/recipes.md](recipes.md) — copy-pasteable how-tos
-- [../../dev/planning/SPEC.md](../../dev/planning/SPEC.md) — planned work
+- [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../) — planned work
