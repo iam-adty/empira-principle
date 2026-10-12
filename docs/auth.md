@@ -1,18 +1,42 @@
 # Auth
 
-> **Status: describes shipped code.** Verified against `487 tests, 1097
+> **Status: describes shipped code.** Verified against `502 tests, 1127
 > assertions`.
+>
+> **This document describes the module, and it is becoming one.** Authentication
+> currently lives in `src/Auth/` and will move to the sibling `auth/` package as
+> `Empira\Auth`. What the *framework core* keeps is only what is below the line —
+> the contracts an application without authentication still needs.
 
-The framework knows **who is asking**. It does not know what a user is, where
-users are stored, or what a password is — and it deliberately does not care.
+## The split
 
-Three interfaces, kept apart on purpose:
+Authentication is two halves, and only one of them needs the mechanism.
+
+**Core keeps** (`Empira\Security`) — the read side, because a layout asking
+"is anyone signed in" and CSRF asking "was this proven without a cookie" must
+both work in an application that installed no auth module at all:
 
 | | Answers |
 |---|---|
-| `Auth\Guard` | who is making *this* request? |
-| `Auth\UserProvider` | which user is that id, and is this password theirs? |
-| `Auth\Auth` | the guards, asked once per request |
+| `Identity` | who is this? — an `id()`, and deliberately nothing else |
+| `Guard` | given *this* request, whose credential is it? |
+| `NonAmbientCredential` | marker: a browser will not send this credential by itself |
+| `RequestUser` | the guards, asked once per request — `user/check/guest/id/guard` |
+| `Module` | `register(Application)` — the one hook a module plugs into |
+
+**The auth module provides** (`Empira\Auth`) — everything that writes, plus the
+storage:
+
+| | Answers |
+|---|---|
+| `User` | a Doctrine entity over `users` |
+| `UserProvider` | which user is that id, and is this password theirs? |
+| `SessionGuard`, `BearerGuard` | the two mechanisms this package ships |
+| `Auth` | the façade: `RequestUser` narrowed to `User`, plus `login`/`logout` |
+| `RequireAuth` | the middleware that refuses a request with nobody behind it |
+
+`RequestUser` and `Auth` are **bound as two separate objects**, deliberately. See
+the trap in [../AGENTS.md](../AGENTS.md) about why one object cannot serve both.
 
 ## Wiring it
 
@@ -24,20 +48,29 @@ $app->auth(
 ```
 
 Guards are consulted in order and the first user wins. Nothing happens until
-`auth()` is called, so an application with no users pays nothing.
+`auth()` is called, so an application with no users pays nothing. Once the module
+is its own package, this becomes `$app->module(new AuthModule(...))`.
 
 ## Asking
 
 ```php
+// Anything the framework provides — a layout, a route, CSRF:
+public function __construct(private readonly RequestUser $user) {}
+
+$this->user->user();    // Identity|null — whatever a guard produced
+$this->user->check();   // bool
+$this->user->id();      // int|string|null
+$this->user->guest();   // bool
+
+// Anything in the auth module, or an app that installed it:
 public function __construct(private readonly Auth $auth) {}
 
-$this->auth->user();    // User|null
-$this->auth->check();   // bool
-$this->auth->id();      // int|string|null
-$this->auth->guest();   // bool
+$this->auth->user();    // User|null — narrowed
+$this->auth->login($user);   // writes
+$this->auth->logout();       // writes
 ```
 
-`Auth` is bound **per request**, not once at boot. That is the reason it needs
+`RequestUser` is bound **per request**, not once at boot. That is the reason it needs
 no `reset()`: a fresh instance cannot remember the request before it. A
 singleton would need resetting before every dispatch, and a reset someone
 forgets is a request that runs as the user before it — the same failure this

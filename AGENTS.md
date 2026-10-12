@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `487 tests, 1097 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `502 tests, 1127 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -80,9 +80,11 @@ So:
 | `src/Container/` | Autowiring service container |
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
 | `src/Config/` | `.env` parsing, dot-notation config, `DatabaseConfig` (the one reader for `DB_*`) |
-| `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth`, and `User` — which is a Doctrine entity |
+| `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth`, and `User` — which is a Doctrine entity. **Becoming a module**: the read half (`user/check/guest/id/guard`) already lives in core as `Security\RequestUser`, and `Auth` is now only the write half (`login`/`logout`). |
 | `src/Persistence/` | `EntityManagerFactory` — the manager, and how it is built |
 | `src/Security/Csrf.php` | Session-backed CSRF for component actions |
+| `src/Security/{Identity,Guard,RequestUser,NonAmbientCredential}.php` | The contracts core keeps so authentication can be a module: *who* is this request, found by *what*, and was the credential ambient |
+| `src/Module.php` | `Module::register(Application)` — the one hook a module (like auth) plugs into |
 | `src/Testing/` | `TestClient`, `TestResponse` |
 | `src/Console/` | CLI kernel, commands, and `Bootstrap` (finding a project's own commands) |
 
@@ -204,6 +206,8 @@ replaces: a fresh `Session` per request looks cleaner and is **wrong**, because
 `$app->auth(new SessionGuard($app->session(), …))` captures it at boot and every
 guard then reads a session nothing writes to. See
 [docs/workers.md](docs/workers.md).
+
+**A subclass that narrows a return type turns an unrelated identity into `null`.** Binding the auth module's `Auth` object under the core's `RequestUser` contract "to avoid two objects" made every `RequestUser` answer come back narrowed: a guard returning a plain `Identity` (not the module's `User`) was silently reported as *nobody*. The symptom was a module-installed guard that authenticated and then read as anonymous, with no type error anywhere — the narrowing is legal, so PHP said nothing. The two contracts are now bound to **separate objects**: core builds `RequestUser` and stays ignorant of users, the module builds `Auth` and stays ignorant of how core resolves them. *When one object serves two contracts and one of them narrows, they are not interchangeable — and the failure looks like the feature not working, not like a type problem.*
 
 **Anything built at boot and held is frozen at whichever request came first.**
 That is what `$app->use(new Middleware(...))` does to a middleware's `Format`

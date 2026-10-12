@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status: describes shipped code.** Verified against `487 tests, 1097 assertions`.
+> **Status: describes shipped code.** Verified against `502 tests, 1127 assertions`.
 > Planned changes are in [SPEC.md](SPEC.md).
 
 How a request flows through Empira, and why it is built this way.
@@ -168,15 +168,28 @@ See [docs/data.md](docs/data.md).
 
 ## Identity is resolved before anything asks
 
-`Auth` is bound per request, beside `Request`, `Format` and `RouteParams`, and
-consults its guards once. It is not a singleton because it does not need
+`RequestUser` is bound per request, beside `Request`, `Format` and `RouteParams`,
+and consults its guards once. It is not a singleton because it does not need
 resetting — a fresh instance cannot remember the request before it.
+
+It is bound as its **own** contract, separate from the auth module's `Auth`
+façade, and the two are different objects on purpose. `RequestUser` answers with
+whatever `Identity` a guard produced and knows nothing about users; `Auth`
+narrows that to the module's `User` and adds `login()`/`logout()`. Core builds
+the first so that a layout, a route handler, or the CSRF check works for any
+identity a module might produce — including one this framework has never heard
+of — while the module builds the second. Had core bound its `Auth` object under
+`RequestUser` as well, a valid non-`User` identity would have been narrowed to
+`null` on the way out, and the failure would have looked like "authentication
+silently stopped working" rather than a type error.
 
 The distinction the framework is careful about is *who* versus *which
 credential*: a session-authenticated request and a bearer-authenticated request
 both have a user, and only the second is exempt from CSRF. One is protected by
 an ambient cookie the browser attaches by itself; the other is not, and a
-cross-site page cannot forge it.
+cross-site page cannot forge it. The framework asks whether the answering guard
+is marked `NonAmbientCredential` — a property, not a class — so a module can add
+its own mechanism without CSRF growing an `instanceof` per mechanism.
 
 See [docs/auth.md](docs/auth.md).
 

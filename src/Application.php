@@ -6,7 +6,8 @@ namespace Empira;
 
 use Empira\Config\Config;
 use Empira\Auth\Auth;
-use Empira\Auth\Guard;
+use Empira\Security\Guard;
+use Empira\Security\RequestUser;
 use Empira\Container\Container;
 use Empira\Html;
 use Empira\Http\Format;
@@ -92,8 +93,11 @@ final class Application
      */
     private bool $trustProxies = false;
 
-    /** @var list<\Empira\Auth\Guard> */
+    /** @var list<\Empira\Security\Guard> */
     private array $guards = [];
+
+    /** @var list<Module> */
+    private array $modules = [];
 
     /** @var array<string, \Empira\Console\Command> commands the application supplied */
     private array $commands = [];
@@ -158,6 +162,44 @@ final class Application
         $this->guards = array_values($guards);
 
         return $this;
+    }
+
+    /**
+     * Install modules — the units of functionality this framework does not
+     * assume an application needs.
+     *
+     *     $app->module(new AuthModule(new DoctrineUserProvider($app->entities())));
+     *
+     * Registered in order and immediately: a module that adds entity paths
+     * needs `orm()` to have run, and one that adds routes needs to be installed
+     * before discovery. Registering late is therefore a mistake the caller sees
+     * as a missing route or an unmapped entity, not as "too late".
+     *
+     * Chainable, like everything else here, because the boot sequence reads as
+     * one statement per thing the application wants rather than a list of calls
+     * whose return values have to be threaded.
+     *
+     * @param Module ...$modules
+     */
+    public function module(Module ...$modules): self
+    {
+        foreach ($modules as $module) {
+            $module->register($this);
+
+            $this->modules[] = $module;
+        }
+
+        return $this;
+    }
+
+    /**
+     * The modules installed on this application, in registration order.
+     *
+     * @return list<Module>
+     */
+    public function modules(): array
+    {
+        return $this->modules;
     }
 
     /**
@@ -446,6 +488,16 @@ final class Application
         $this->container->instance(RouteParams::class, $this->params);
 
         // Per request, not per application: see auth().
+        //
+        // The read-only context is bound under its *own* contract and built here
+        // in core, so anything that only needs to ask "who is this" works with
+        // whatever `Identity` a guard produced — including one from a module
+        // this framework has never heard of. The auth module binds its own
+        // façade (`Auth`) separately, over its own guards, because that class
+        // narrows to a `User` and must not be the thing core hands to everybody.
+        // Two objects, two jobs: core stays ignorant of users, the module stays
+        // ignorant of how core resolves them.
+        $this->container->instance(RequestUser::class, new RequestUser($this->guards, $request));
         $this->container->instance(Auth::class, new Auth($this->guards, $request));
 
         try {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Empira\Http\Middleware;
 
 use Closure;
-use Empira\Auth\Auth;
+use Empira\Security\RequestUser;
 use Empira\Http\Format;
 use Empira\Http\Middleware;
 use Empira\Http\Request;
@@ -61,7 +61,7 @@ final class VerifyCsrfToken implements Middleware
     public function __construct(
         private readonly Csrf $csrf,
         private readonly Format $format = Format::Html,
-        private readonly ?Auth $auth = null,
+        private readonly ?RequestUser $auth = null,
         private readonly ?RouteCollection $routes = null,
     ) {
     }
@@ -76,7 +76,7 @@ final class VerifyCsrfToken implements Middleware
             return $next($request);
         }
 
-        if ($this->routeOptsOut($request) || $this->authenticatedByBearer($request)) {
+        if ($this->routeOptsOut($request) || $this->authenticatedByNonAmbientCredential($request)) {
             return $next($request);
         }
 
@@ -107,9 +107,9 @@ final class VerifyCsrfToken implements Middleware
      * on the shape of a header would be a hole a page could open by sending a
      * useless one.
      */
-    private function authenticatedByBearer(Request $request): bool
+    private function authenticatedByNonAmbientCredential(Request $request): bool
     {
-        return $this->auth?->authenticatedByBearer() === true;
+        return $this->auth?->authenticatedByNonAmbientCredential() === true;
     }
 
     private function refuse(): Response

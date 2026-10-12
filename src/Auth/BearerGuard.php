@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Empira\Auth;
 
 use Empira\Http\Request;
+use Empira\Security\NonAmbientCredential;
 
 /**
  * Signs a user in with an `Authorization: Bearer …` header.
@@ -23,7 +24,7 @@ use Empira\Http\Request;
  * The token is never logged and never appears in an error message: an
  * exception that quotes the credential puts it in a log file.
  */
-final class BearerGuard implements Guard
+final class BearerGuard implements Guard, NonAmbientCredential
 {
     public const DEFAULT_SCHEME = 'Bearer';
 

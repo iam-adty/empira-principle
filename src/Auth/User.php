@@ -6,6 +6,7 @@ namespace Empira\Auth;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Empira\Security\Identity;
 
 /**
  * Who is making this request — and, since this is the entity the framework
@@ -43,7 +44,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
 #[ORM\UniqueConstraint(name: 'users_email_unique', columns: ['email'])]
-class User
+class User implements Identity
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]

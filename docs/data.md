@@ -1,6 +1,6 @@
 # Data
 
-> **Status: describes shipped code.** Verified against `487 tests, 1097
+> **Status: describes shipped code.** Verified against `502 tests, 1127
 > assertions`; the PostgreSQL tests run against a real server in Docker.
 
 Persistence is Doctrine's. The framework wires it and gets out of the way:

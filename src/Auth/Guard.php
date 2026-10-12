@@ -5,23 +5,18 @@ declare(strict_types=1);
 namespace Empira\Auth;
 
 use Empira\Http\Request;
+use Empira\Security\Guard as SecurityGuard;
 
 /**
- * Turns a request into a user, or into nothing.
+ * A guard that answers with a {@see User} rather than a bare identity.
  *
- * This is the whole extension point. The framework ships guards for the two
- * mechanisms it understands — a session and a bearer token — and an application
- * that wants its own writes one more. Nothing else in the framework needs to
- * change, because nothing else knows how a user is found.
- *
- * A guard must return null for a credential it does not recognise. Returning
- * null is how "this is not for me" is said; returning a user for an
- * unrecognised credential would be a way to authenticate anyone.
+ * This is the module's narrowing of {@see SecurityGuard}: the core contract
+ * promises an {@see \Empira\Security\Identity}, and a session or bearer guard
+ * in this package can say more precisely which one it will return. Narrowing a
+ * return type is legal in PHP, so the guards here satisfy the core contract
+ * without the core ever mentioning `User`.
  */
-interface Guard
+interface Guard extends SecurityGuard
 {
-    /**
-     * The user making this request, or null when there is not one.
-     */
     public function identify(Request $request): ?User;
 }
