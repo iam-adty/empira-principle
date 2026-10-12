@@ -32,7 +32,36 @@ $request->fullUrl();              // absolute
 $request->isMethod('POST');
 $request->header('x-custom');     // case-insensitive
 $request->csrfToken();            // the header, or the _csrf field
+$request->ip();                   // who it came from, or null
 ```
+
+### `ip()`, and believing whoever says so
+
+`ip()` returns the **socket address**, and only the socket address, unless the
+application has said a proxy is in front:
+
+```php
+$app->trustProxies();   // nginx, Caddy or Cloudflare is rewriting the address
+```
+
+Off by default, because the consequence of being wrong is silent.
+`X-Forwarded-For` is set by whoever sent the request, so with nothing in front of
+the application it is a value the **client chose** — and a log full of
+client-chosen addresses is worse than no addresses, because it looks like
+evidence. The reverse mistake is quieter: behind a proxy every request arrives
+from the proxy, so a log with one repeated value is a lie rather than an
+absence.
+
+Three details worth knowing:
+
+- A forwarded chain is oldest-first and the client is taken from the **head**;
+  the tail is the nearest proxy every time.
+- Everything is validated. A malformed header falls back to the socket address,
+  and a `REMOTE_ADDR` that is a unix socket path returns `null` — both are better
+  than a value that gets written into a log and believed later.
+- Under the CLI there is no address at all, so `ip()` returns `null`.
+
+**Do not build a rate limiter on this without reading the paragraph above.**
 
 ## htmx request headers
 
@@ -130,6 +159,14 @@ $response->noStore();
 
 Header values are sanitised: `CR`, `LF` and `NUL` are stripped, so a value cannot
 smuggle in a second header.
+
+### Error views keep the headers
+
+`$app->onHttpError(fn(int $status, string $message) => …)` replaces the body of
+an error response, and **leaves the headers alone**. An `HttpException` carries
+headers that are protocol rather than decoration — `Allow` on a 405,
+`Retry-After` on a 429 — and they survive the view. The view chooses what the
+response *says*; it does not get to change what the response *means*.
 
 ### Sending
 

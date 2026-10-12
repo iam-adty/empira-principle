@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `475 tests, 1081 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `487 tests, 1097 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -101,6 +101,9 @@ Break one of these and a component becomes exploitable or silently broken.
 
 ## Conventions
 
+- **Plans go in the todo tool**, so they show in the opencode TUI sidebar. The
+  rule itself is one level up, in the workspace
+  [`AGENTS.md`](../AGENTS.md), because it is not specific to this package.
 - **Edit source with the Edit tool.** Not `sed -i`, not `python3 -c`, not a
   heredoc that rewrites a file. Those have no review step, they fail silently
   when the pattern does not match, and they leave a half-applied file when they
@@ -215,6 +218,12 @@ silently, with nothing in any log, and only when two requests happen to land on
 the same thread. `Application::handle()` calls `clear()` for exactly this reason,
 next to `Session::beginRequest()`. Do not move it, and do not cache an entity
 anywhere longer than the request that loaded it.
+
+**An `onHttpError` view must not change what the response means.** The view
+replaces the body. It used to return without applying the headers assembled for
+it, so an application that registered one — which is what a decent 404 page is —
+lost `Allow` on a 405 and `Retry-After` on a 429. Both are how a client knows
+what to do next, and both are protocol rather than decoration on it.
 
 **An ORM entity is not a value object.** `$user->id` became `$user->id()` because
 the id is now assigned by the ORM on flush. More importantly, a `User` handed to

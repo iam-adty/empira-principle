@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **475 framework tests / 1081 assertions**, **30 app tests / 89 assertions**.
+Current: **487 framework tests / 1097 assertions**, **45 app tests / 128 assertions**.
 
 ---
 
@@ -115,6 +115,11 @@ wiring are still the framework's own.
   `Session::beginRequest()`~~
 - ~~`Auth\User` is an entity, `DoctrineUserProvider` reads it~~
 - ~~`src/Data/` deleted — 1433 lines the ORM had already replaced~~
+- ~~`Request::ip()` — the socket address, and proxy headers only when
+  `Application::trustProxies()` says so; a log full of client-chosen addresses
+  is worse than none, because it looks like evidence~~
+- ~~An `onHttpError` view no longer discards the headers it was handed~~ — it
+  chooses the body, not what the response means
 
 ### Operations — 2026-10-12
 - ~~Migrations and seeding are deploy steps — `empira migrate`, `empira seed` —
