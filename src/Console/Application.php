@@ -9,6 +9,7 @@ use Empira\Console\Commands\Migrate;
 use Empira\Console\Commands\MakeController;
 use Empira\Console\Commands\RouteList;
 use Empira\Console\Commands\Serve;
+use Empira\Application as Framework;
 
 /**
  * The console kernel: a registry of commands and the dispatcher that runs one.
@@ -44,6 +45,32 @@ final class Application
      * @var array<string, Command>
      */
     private array $project = [];
+
+    /**
+     * The booted project, when there is one.
+     *
+     * Held because a command may need more than the commands a project
+     * registered: `migrate` has to plan across the migrations *modules*
+     * contribute, and only the booted application knows those. Handing it to
+     * every command's `handle()` would be worse — a seeder has no use for it,
+     * and a command that could see the whole application would eventually
+     * depend on it.
+     */
+    private ?Framework $booted = null;
+
+    /**
+     * Give the console the booted project.
+     *
+     * Separate from {@see project()} on purpose: that adds a command, this
+     * says what the project is. `bin/empira` needs both and they are different
+     * facts — a project may register no commands and still ship modules.
+     */
+    public function booted(Framework $application): self
+    {
+        $this->booted = $application;
+
+        return $this;
+    }
 
     public function __construct()
     {
@@ -121,6 +148,10 @@ final class Application
             $this->writeListing($output);
 
             return 1;
+        }
+
+        if ($this->booted !== null && isset($this->commands['migrate'])) {
+            $this->commands['migrate']->withModuleMigrations($this->booted->migrationSources());
         }
 
         return $commands[$command]->handle(self::options($arguments), $output);

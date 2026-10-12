@@ -49,15 +49,19 @@ use Empira\Console\Output;
 $console = new Application();
 
 try {
-    $project = Bootstrap::commandsFor(getcwd() ?: '.');
+    $booted = Bootstrap::boot(getcwd() ?: '.');
 } catch (\Throwable $e) {
     fwrite(STDERR, 'empira: ' . $e->getMessage() . PHP_EOL);
 
     exit(1);
 }
 
-foreach ($project as $name => $command) {
-    $console->project($name, $command);
+if ($booted !== null) {
+    foreach ($booted->commands() as $name => $command) {
+        $console->project($name, $command);
+    }
+
+    $console->booted($booted);
 }
 
 exit($console->run($argv, new Output()));

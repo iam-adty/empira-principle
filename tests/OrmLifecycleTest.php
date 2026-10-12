@@ -7,11 +7,10 @@ namespace Empira\Tests;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Empira\Application;
-use Empira\Auth\DoctrineUserProvider;
-use Empira\Auth\User;
 use Empira\Config\Config;
 use Empira\Http\Request;
 use Empira\State\NullState;
+use Empira\Tests\Fixtures\Person;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -30,11 +29,7 @@ final class OrmLifecycleTest extends TestCase
 {
     private const SECRET = 'test-secret-that-is-long-enough-for-hmac!!';
 
-    private const HASH = '$2y$10$Ua89QG/6trEgtY0K1UKd2Ot6.giI.2..iM8F1dZqqW8K9/c/IDEma';
-
     private EntityManagerInterface $entities;
-
-    private DoctrineUserProvider $users;
 
     /** A real file, because `:memory:` gives each connection its own database. */
     private string $database = '';
@@ -51,16 +46,14 @@ final class OrmLifecycleTest extends TestCase
 
         $this->entities = \Empira\Persistence\EntityManagerFactory::make(
             new Config(['driver' => 'sqlite', 'database' => $this->database]),
-            [__DIR__ . '/../src/Auth'],
+            [__DIR__ . '/Fixtures'],
         );
 
         (new SchemaTool($this->entities))->createSchema(
-            [$this->entities->getClassMetadata(User::class)]
+            [$this->entities->getClassMetadata(Person::class)]
         );
 
-        $this->users = new DoctrineUserProvider($this->entities);
-
-        $this->entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        $this->entities->persist(new Person('ada@example.com', 'Ada'));
         $this->entities->flush();
         $this->entities->clear();
     }
@@ -123,7 +116,7 @@ final class OrmLifecycleTest extends TestCase
 
         // Changed behind the worker's back, between the two requests.
         $this->entities->getConnection()->executeStatement(
-            "UPDATE users SET name = ? WHERE email = ?",
+            "UPDATE people SET name = ? WHERE email = ?",
             ['Ada Lovelace', 'ada@example.com']
         );
 
@@ -142,7 +135,7 @@ final class OrmLifecycleTest extends TestCase
         self::assertSame('Ada', $this->seenName($app));
 
         $this->entities->getConnection()->executeStatement(
-            'DELETE FROM users WHERE email = ?',
+            'DELETE FROM people WHERE email = ?',
             ['ada@example.com']
         );
 
@@ -162,14 +155,14 @@ final class OrmLifecycleTest extends TestCase
         $app = new Application(self::SECRET, new NullState());
 
         $app->orm(['driver' => 'sqlite', 'database' => $this->database]);
-        $app->auth(new class($app->entities()) implements \Empira\Auth\Guard {
+        $app->auth(new class($app->entities()) implements \Empira\Security\Guard {
             public function __construct(private readonly EntityManagerInterface $entities)
             {
             }
 
-            public function identify(Request $request): ?User
+            public function identify(Request $request): ?Person
             {
-                return $this->entities->getRepository(User::class)->findOneBy([]);
+                return $this->entities->getRepository(Person::class)->findOneBy([]);
             }
         });
 
@@ -184,6 +177,6 @@ final class OrmLifecycleTest extends TestCase
         // being measured rather than a direct call to `clear()`.
         $app->handle($request);
 
-        return $app->container()->get(\Empira\Auth\Auth::class)->user()?->name();
+        return $app->container()->get(\Empira\Security\RequestUser::class)->user()?->name();
     }
 }

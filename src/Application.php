@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Empira;
 
 use Empira\Config\Config;
-use Empira\Auth\Auth;
 use Empira\Security\Guard;
 use Empira\Security\RequestUser;
 use Empira\Container\Container;
@@ -99,6 +98,9 @@ final class Application
     /** @var list<Module> */
     private array $modules = [];
 
+    /** @var array<string, string> namespace => migration directory, from modules */
+    private array $migrationSources = [];
+
     /** @var array<string, \Empira\Console\Command> commands the application supplied */
     private array $commands = [];
 
@@ -149,19 +151,34 @@ final class Application
      *         new BearerGuard($users->byApiToken(...)),
      *     );
      *
-     * An `Auth` is then built and bound **per request**, not once at boot. That
-     * is deliberate: a singleton would need resetting before every dispatch,
-     * and a reset someone forgets is a request that runs as the user before
-     * it. A fresh instance cannot remember the request before it, so there is
-     * nothing to forget.
+     * A `RequestUser` is then built and bound **per request**, not once at boot.
+     * That is deliberate: a singleton would need resetting before every
+     * dispatch, and a reset someone forgets is a request that runs as the user
+     * before it. A fresh instance cannot remember the request before it, so
+     * there is nothing to forget.
      *
-     * Guards are consulted in order and the first user wins.
+     * Guards are consulted in order and the first identity wins.
      */
     public function auth(Guard ...$guards): self
     {
         $this->guards = array_values($guards);
 
         return $this;
+    }
+
+    /**
+     * The guards currently registered, in the order they are consulted.
+     *
+     * Exposed for modules that need to build their own per-request service from
+     * them — the auth module binds its `Auth` façade from exactly this list, so
+     * the object it publishes and the one the framework resolves from are built
+     * from the same guards and cannot disagree about who is signed in.
+     *
+     * @return list<Guard>
+     */
+    public function guards(): array
+    {
+        return $this->guards;
     }
 
     /**
@@ -187,6 +204,16 @@ final class Application
             $module->register($this);
 
             $this->modules[] = $module;
+
+            // A module that ships migrations says so here, at the same moment it
+            // registers the rest of itself. Collecting it separately — after
+            // every module had run — would be a second pass over the list for
+            // information already available.
+            if ($module instanceof MigrationSource) {
+                foreach ($module->migrations() as $namespace => $directory) {
+                    $this->migrationSources[$namespace] = $directory;
+                }
+            }
         }
 
         return $this;
@@ -203,13 +230,18 @@ final class Application
     }
 
     /**
-     * The authentication guards, whether or not any have been registered.
+     * Migration directories contributed by modules, keyed by namespace.
      *
-     * @return list<Guard>
+     * Read by `empira migrate`, which has to plan across every source at once —
+     * Doctrine keeps one version ledger for the whole database, so a module's
+     * migration and a project's are steps in one sequence rather than two that
+     * happen to share a table.
+     *
+     * @return array<string, string> namespace => directory
      */
-    public function guards(): array
+    public function migrationSources(): array
     {
-        return $this->guards;
+        return $this->migrationSources;
     }
 
     /**
@@ -282,9 +314,14 @@ final class Application
      * the runtime and the deploy step cannot disagree about which database
      * either of them means.
      *
-     * `entityPaths` defaults to the framework's own directory. An application
-     * with entities of its own passes them too — the framework's `Auth` entities
-     * should still be mapped, or {@see DoctrineUserProvider} cannot find a user.
+     * `entityPaths` is exactly what it says — the directories to map — and
+     * defaults to none. It used to silently include the framework's own `Auth`
+     * directory, which meant an application could not have an ORM without also
+     * getting a `users` table it never asked for, and could not have its own
+     * entities *instead* of the framework's. A framework choosing its
+     * application's schema is not a default; it is a decision made on the
+     * application's behalf. An application using the auth module passes its
+     * directory alongside its own, or asks `AuthModule::entityPath()` for it.
      *
      * @param list<string> $entityPaths directories holding `#[Entity]` classes
      */
@@ -294,10 +331,7 @@ final class Application
 
         $this->container->instance(
             EntityManagerInterface::class,
-            EntityManagerFactory::make(
-                new Config($items),
-                $entityPaths === [] ? [__DIR__ . '/Auth'] : array_merge([__DIR__ . '/Auth'], $entityPaths),
-            ),
+            EntityManagerFactory::make(new Config($items), $entityPaths),
         );
 
         return $this;
@@ -487,18 +521,13 @@ final class Application
         $this->container->instance(Format::class, $this->format);
         $this->container->instance(RouteParams::class, $this->params);
 
-        // Per request, not per application: see auth().
-        //
-        // The read-only context is bound under its *own* contract and built here
-        // in core, so anything that only needs to ask "who is this" works with
-        // whatever `Identity` a guard produced — including one from a module
-        // this framework has never heard of. The auth module binds its own
-        // façade (`Auth`) separately, over its own guards, because that class
-        // narrows to a `User` and must not be the thing core hands to everybody.
-        // Two objects, two jobs: core stays ignorant of users, the module stays
-        // ignorant of how core resolves them.
+        // Per request, not per application: see auth(). Bound under its *own*
+        // contract and built here in core, so anything that only needs to ask
+        // "who is this" works with whatever `Identity` a guard produced —
+        // including one from a module this framework has never heard of. The
+        // auth module binds its own façade (`Auth`), which narrows to a `User`
+        // and adds login/logout; core does not know that class exists.
         $this->container->instance(RequestUser::class, new RequestUser($this->guards, $request));
-        $this->container->instance(Auth::class, new Auth($this->guards, $request));
 
         try {
             $response = $this->pipeline->send(

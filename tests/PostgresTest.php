@@ -7,8 +7,7 @@ namespace Empira\Tests;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use Empira\Auth\DoctrineUserProvider;
-use Empira\Auth\User;
+use Empira\Tests\Fixtures\Person;
 use Empira\Config\Config;
 use Empira\Persistence\EntityManagerFactory;
 use PHPUnit\Framework\Attributes\Group;
@@ -23,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  * agrees with it. That layer is gone; the claim is not.
  *
  * What replaced it is a different and larger claim: that Doctrine's schema,
- * its queries and its migrations work against this server, and that a `User`
+ * its queries and its migrations work against this server, and that a `Person`
  * written on SQLite is the same object on PostgreSQL. SQLite forgives a great
  * deal, so a suite that only ever runs on it is a suite that has not been
  * tested.
@@ -38,7 +37,6 @@ use PHPUnit\Framework\TestCase;
 #[Group('driver')]
 final class PostgresTest extends TestCase
 {
-    private const HASH = '$2y$10$Ua89QG/6trEgtY0K1UKd2Ot6.giI.2..iM8F1dZqqW8K9/c/IDEma';
 
     private ?EntityManagerInterface $entities = null;
 
@@ -55,7 +53,7 @@ final class PostgresTest extends TestCase
                 'username' => (string) getenv('EMPIRA_TEST_PGSQL_USER'),
                 'password' => (string) getenv('EMPIRA_TEST_PGSQL_PASSWORD'),
             ]),
-            [__DIR__ . '/../src/Auth'],
+            [__DIR__ . '/Fixtures'],
         );
     }
 
@@ -105,7 +103,7 @@ final class PostgresTest extends TestCase
         self::assertNotNull($entities);
 
         $tool = new SchemaTool($entities);
-        $metadata = [$entities->getClassMetadata(User::class)];
+        $metadata = [$entities->getClassMetadata(Person::class)];
 
         $tool->dropSchema($metadata);
         $tool->createSchema($metadata);
@@ -119,7 +117,7 @@ final class PostgresTest extends TestCase
         // server: hand it what the mapping produces and it must accept it.
         $entities = $this->schema();
 
-        $user = new User('ada@example.com', 'Ada', self::HASH);
+        $user = new Person('ada@example.com', 'Ada');
         $entities->persist($user);
         $entities->flush();
 
@@ -129,16 +127,15 @@ final class PostgresTest extends TestCase
     public function testAnIdentityColumnComesBackAsAnInteger(): void
     {
         $entities = $this->schema();
-        $users = new DoctrineUserProvider($entities);
-
-        $entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        
+        $entities->persist(new Person('ada@example.com', 'Ada'));
         $entities->flush();
         $entities->clear();
 
         // `find()` takes an int here but the interface allows int|string, and a
         // driver handing back "1" rather than 1 is the kind of difference that
         // only a real server shows.
-        self::assertSame('Ada', $users->byId('1')?->name());
+        self::assertSame('Ada', $entities->getRepository(Person::class)->find('1')?->name());
     }
 
     public function testTheJsonColumnRoundTrips(): void
@@ -147,25 +144,25 @@ final class PostgresTest extends TestCase
         // comes back wrong here means the column type is wrong on one of them.
         $entities = $this->schema();
 
-        $entities->persist(new User('ada@example.com', 'Ada', self::HASH, ['role' => 'admin', 'seen' => 3]));
+        $entities->persist(new Person('ada@example.com', 'Ada', ['role' => 'admin', 'seen' => 3]));
         $entities->flush();
         $entities->clear();
 
-        $found = $entities->find(User::class, 1);
+        $found = $entities->find(Person::class, 1);
 
         self::assertNotNull($found);
-        self::assertSame('admin', $found->attribute('role'));
-        self::assertSame(3, $found->attribute('seen'), 'a JSON integer should not come back a string');
+        self::assertSame('admin', $found->attributes()['role'] ?? null);
+        self::assertSame(3, $found->attributes()['seen'] ?? null, 'a JSON integer should not come back a string');
     }
 
     public function testTheUniqueIndexIsEnforcedByTheServerNotByTheApplication(): void
     {
         $entities = $this->schema();
 
-        $entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        $entities->persist(new Person('ada@example.com', 'Ada'));
         $entities->flush();
 
-        $entities->persist(new User('ada@example.com', 'Someone Else', self::HASH));
+        $entities->persist(new Person('ada@example.com', 'Someone Else'));
 
         // This is the whole argument for writing through the ORM rather than
         // checking first: two concurrent registrations both pass a check-then-
@@ -183,23 +180,22 @@ final class PostgresTest extends TestCase
     public function testClearingTheManagerReadsThroughToTheServer(): void
     {
         $entities = $this->schema();
-        $users = new DoctrineUserProvider($entities);
-
-        $entities->persist(new User('ada@example.com', 'Ada', self::HASH));
+        
+        $entities->persist(new Person('ada@example.com', 'Ada'));
         $entities->flush();
 
         $entities->getConnection()->executeStatement(
-            "UPDATE users SET name = ? WHERE email = ?",
+            "UPDATE people SET name = ? WHERE email = ?",
             ['Ada Lovelace', 'ada@example.com']
         );
 
-        self::assertSame('Ada', $users->byId(1)?->name(), 'the identity map serves the cached entity');
+        self::assertSame('Ada', $entities->getRepository(Person::class)->find(1)?->name(), 'the identity map serves the cached entity');
 
         $entities->clear();
 
         self::assertSame(
             'Ada Lovelace',
-            $users->byId(1)?->name(),
+            $entities->getRepository(Person::class)->find(1)?->name(),
             'a cleared manager must read through to the server'
         );
     }

@@ -34,10 +34,28 @@ final class Bootstrap
      */
     public static function commandsFor(string $directory): array
     {
+        return self::boot($directory)?->commands() ?? [];
+    }
+
+    /**
+     * Boot the project and return the application itself, or null when this
+     * directory has none.
+     *
+     * The commands are one thing a caller wants; the *modules* are another, and
+     * `empira migrate` needs the second — a module that ships migrations
+     * registers them on the application, and a command that never saw the
+     * application would plan a schema missing every table it is responsible
+     * for. So the boot is exposed rather than only its commands.
+     *
+     * @throws \RuntimeException when the bootstrap returns something that is
+     *                           not an Application
+     */
+    public static function boot(string $directory): ?Application
+    {
         $file = self::locate($directory);
 
         if ($file === null) {
-            return [];
+            return null;
         }
 
         $booted = require $file;
@@ -50,7 +68,7 @@ final class Bootstrap
             ));
         }
 
-        return $booted->commands();
+        return $booted;
     }
 
     /**

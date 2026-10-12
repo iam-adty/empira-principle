@@ -251,19 +251,19 @@ final class WorkerTest extends TestCase
             $connection = $app->entities()->getConnection();
 
             (new \Doctrine\ORM\Tools\SchemaTool($app->entities()))->createSchema(
-                [$app->entities()->getClassMetadata(\Empira\Auth\User::class)]
+                [$app->entities()->getClassMetadata(\Empira\Tests\Fixtures\Person::class)]
             );
 
-            $app->entities()->persist(new \Empira\Auth\User('ada@example.com', 'Ada', 'x'));
+            $app->entities()->persist(new \Empira\Tests\Fixtures\Person('ada@example.com', 'Ada'));
             $app->entities()->flush();
 
             // Warm the worker, so it has genuinely held a user once.
             $app->handle(new Request('GET', '/'));
-            $app->entities()->getRepository(\Empira\Auth\User::class)->find(1);
+            $app->entities()->getRepository(\Empira\Tests\Fixtures\Person::class)->find(1);
 
             // Changed on another connection — a second process, an admin tool.
             $connection->executeStatement(
-                "UPDATE users SET name = ? WHERE email = ?",
+                "UPDATE people SET name = ? WHERE email = ?",
                 ['Ada Lovelace', 'ada@example.com']
             );
 
@@ -271,7 +271,7 @@ final class WorkerTest extends TestCase
 
             self::assertSame(
                 'Ada Lovelace',
-                $app->entities()->getRepository(\Empira\Auth\User::class)->find(1)?->name(),
+                $app->entities()->getRepository(\Empira\Tests\Fixtures\Person::class)->find(1)?->name(),
                 'the worker served this request from the last one\'s identity map'
             );
         } finally {

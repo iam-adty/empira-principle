@@ -44,6 +44,34 @@ final class Migrate implements Command
      */
     private const MIGRATION_NAMESPACE = 'Empira\\Migrations';
 
+    /**
+     * Migration directories contributed by modules, keyed by namespace.
+     *
+     * Set by the console before dispatch, from the booted application. A module
+     * that ships migrations — the auth module's `users` table, say — registers
+     * them there, and without this the command would plan a schema missing the
+     * one table the module is responsible for. It fails at runtime, on the
+     * first query that touches it, which is a long way from the cause.
+     *
+     * Empty is a valid state: a project with no modules migrates exactly as it
+     * did before modules existed.
+     *
+     * @var array<string, string>
+     */
+    private array $moduleMigrations = [];
+
+    /**
+     * Add migration directories from installed modules.
+     *
+     * @param array<string, string> $sources namespace => directory
+     */
+    public function withModuleMigrations(array $sources): self
+    {
+        $this->moduleMigrations = $sources;
+
+        return $this;
+    }
+
     public function name(): string
     {
         return 'migrate';
@@ -213,9 +241,17 @@ final class Migrate implements Command
      */
     private function dependencies(string $directory): DependencyFactory
     {
+        // The project's own migrations keep the project's namespace; each
+        // module's keep whatever namespace its files declare. Doctrine plans
+        // one sequence across all of them, against one version ledger, which is
+        // what makes ordering between a module's table and a project's column
+        // on that table a question with one answer rather than two that happen
+        // to share a `migrations` table.
+        $paths = [self::MIGRATION_NAMESPACE => $directory] + $this->moduleMigrations;
+
         return DependencyFactory::fromConnection(
             new ConfigurationArray([
-                'migrations_paths' => [self::MIGRATION_NAMESPACE => $directory],
+                'migrations_paths' => $paths,
 
                 // Each migration commits on its own. Wrapping the whole run in
                 // one transaction is friendlier on a transaction-aware server
