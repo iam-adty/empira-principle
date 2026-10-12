@@ -1,11 +1,22 @@
 # Long-running workers
 
-One `Application`, booted once, serving many requests.
+One `Application`, booted once, serving many requests. **Optional** — nothing here
+is needed to run an application.
 
 ```bash
-php -S localhost:8000 -t public            # classic: one request, one process
-docker compose up -d                       # worker, 2 x CPU — the default
-FRANKENPHP_WORKERS=1 docker compose up -d  # one worker: a diagnostic, see below
+composer serve                              # classic, one request, one process
+docker compose -f app up -d                 # classic, nginx + php-fpm, no image
+```
+
+A worker is something an application installs, like any other module:
+
+```php
+// bootstrap/modules.php
+return [new FrankenPhpModule()];
+```
+
+```bash
+docker compose -f frankenphp/docker/compose.yml up -d --build
 ```
 
 ## Why this page exists
@@ -22,6 +33,24 @@ wrong answer, served confidently, with nothing in the log.
 This framework is safe in that shape. Not because it has no state, but because
 the state it has is reset in `handle()`, where it cannot be forgotten. The
 rules below are what make that true, and what to hold new code to.
+
+**They hold under a classic runtime too, and that is deliberate.** Everything
+listed under "what is reset" is reset on *every* request, worker or not, and it
+costs nothing on a fresh process. Resetting unconditionally is what lets the same
+application run under both without knowing which it is — and it means the rules
+on this page are not a worker-only appendix, they are simply how the framework is
+written.
+
+Worker mode ships as [`iam-adty/empira-frankenphp`](../frankenphp), which holds
+the loop and a base image, because FrankenPHP cannot be added to a stock PHP at
+runtime — the extension has to exist before PHP starts. The framework itself
+contains no FrankenPHP code and does not require that package; an application that
+never installs it is not missing anything.
+
+`FrankenPhpModule::register()` throws if you install it under a classic runtime.
+That is on purpose: the framework resets correctly either way, so the mismatch is
+otherwise invisible until a session or an identity map leaks across a request
+boundary and the second visitor is served the first one's state.
 
 ## The rule
 
@@ -65,15 +94,14 @@ Everything below happens in `Application::handle()`, before dispatch:
 
 ## What the worker count costs
 
-The default is FrankenPHP's, **2 × CPU** — 32 workers on a 16-core machine. That
-is the right default for throughput and it is what the reference application
-ships. It is not free, and it is worth knowing the bill:
+FrankenPHP's default is **2 × CPU** — 32 workers on a 16-core machine. That is the
+right default for throughput. It is not free, and it is worth knowing the bill:
 
 **Boot is concurrent.** Every worker thread runs `App::boot()`. Thirty-two
-threads asking "does the demo user exist?" all get "no" before any of them
-inserts, and 31 die on the unique index. `App::bootLock()` takes a
-`pg_advisory_lock` around migrations and seeding to put boot back to happening
-once — **anything added to boot that writes must go under it.**
+threads asking "does the user exist?" all get "no" before any of them inserts, and
+31 die on the unique index. `App::bootLock()` takes a `pg_advisory_lock` around
+migrations and seeding to put boot back to happening once — **anything added to
+boot that writes must go under it.**
 
 **Connections scale per worker, not per application.** Each worker holds its own
 PDO handle, so 32 workers is 32 connections out of PostgreSQL's default 100.
@@ -168,7 +196,7 @@ is unambiguous — which is the point, because at the 2 × CPU default a leak on
 shows itself about one request in 32:
 
 ```bash
-FRANKENPHP_WORKERS=1 docker compose up -d --force-recreate --wait app
+FRANKENPHP_WORKERS=1 docker compose -f frankenphp/docker/compose.yml up -d
 ```
 
 Sign in, then interleave requests from that cookie jar and an empty one. The
