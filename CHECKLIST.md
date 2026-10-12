@@ -5,7 +5,7 @@
 > a bug.
 
 Framework: `iam-adty/empira-principle` · app: `iam-adty/empira-app`
-Current: **502 framework tests / 1127 assertions**, **45 app tests / 128 assertions**.
+Current: **473 framework tests / 1071 assertions**, **37 auth tests / 71 assertions**, **15 app tests / 26 assertions**.
 
 ---
 
@@ -128,6 +128,26 @@ wiring are still the framework's own.
 - ~~The application refuses to start on the placeholder `APP_SECRET` outside a
   local environment~~
 
+### Modules — 2026-10-12
+Authentication left the framework. It was the reason every application carried a
+`users` table whether it wanted one or not, because the dependency ran *inward* —
+core to feature — and a dependency that runs inward is one that cannot be cut.
+
+- ~~`Security/{Identity,Guard,RequestUser,NonAmbientCredential}` — the read half,
+  which core keeps because a layout asking "is anyone signed in" and CSRF asking
+  "was this proven without a cookie" must both work in an application that
+  installed no auth module~~
+- ~~`Auth` is now only the write half — `login()`/`logout()`, plus a narrowing to
+  the module's `User`. Everything that knows what a user *is* went with it~~
+- ~~`Module` and `MigrationSource` — one method each, and opt-in for migrations
+  because most modules have no schema to create~~
+- ~~`orm()` maps no directory of its own. It used to include `src/Auth`, so an
+  application could not have an ORM without getting a users table~~
+- ~~`migrate` plans across modules in one sequence against one ledger, which needs
+  `Bootstrap::boot()` to return the application and `bin/empira` to hand it over~~
+- ~~`../auth` is its own package: `AuthModule`, `User`, both guards, the providers,
+  `RequireAuth`, the two `users` migrations, and 540 lines of tests~~
+
 ---
 
 ## Next
@@ -193,7 +213,7 @@ header at all**, so a wildcard resolves to HTML. Verified against
 
 - ~~Authentication~~ — shipped 2026-10-11. Guards, `UserProvider`, per-request
   `Auth`, `RequireAuth`, bearer and session guards. See
-  [docs/auth.md](docs/auth.md).
+  [../auth/README.md](../auth/README.md).
 - ~~CSRF exemption for token-authenticated routes~~ — shipped 2026-10-11. A
   valid bearer token is exempt because an `Authorization` header is not an
   ambient credential, plus a per-route `#[Route(csrf: false)]`. A

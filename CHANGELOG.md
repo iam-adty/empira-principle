@@ -94,7 +94,7 @@ can change without a major bump, though changes are always documented here.
   failure is retried rather than skipped past.
 - **Authentication.** `Auth\Guard`, `Auth\UserProvider` and `Auth\Auth`; session
   and bearer guards; `RequireAuth` middleware; `DatabaseUserProvider`. No user
-  storage and no password policy — see docs/auth.md.
+  storage and no password policy — see ../auth/README.md.
 - **Query builder for what an ORM needs:** aggregates (`count`, `sum`, `avg`,
   `min`, `max`), `groupBy`, `having`, `leftJoin`, `rightJoin`, `exists`.
 - **`#[Route]` attribute routing.** A `Layout` or controller method can declare

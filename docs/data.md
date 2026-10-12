@@ -1,6 +1,6 @@
 # Data
 
-> **Status: describes shipped code.** Verified against `502 tests, 1127
+> **Status: describes shipped code.** Verified against `473 tests, 1071
 > assertions`; the PostgreSQL tests run against a real server in Docker.
 
 Persistence is Doctrine's. The framework wires it and gets out of the way:
@@ -164,5 +164,5 @@ vendor/bin/phpunit --exclude-group driver
 ## Further reading
 
 - [docs/routing.md](routing.md) — handlers and middleware
-- [docs/auth.md](auth.md) — who is asking, and what an entity means here
+- [../../auth/README.md](../../auth/README.md) — who is asking, and what an entity means here
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — where persistence sits in a request

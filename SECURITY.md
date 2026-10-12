@@ -132,7 +132,7 @@ Never pass request input to `Raw`.
 - **No user storage, and no password policy.** `Auth` knows who is asking and
   stops there. Where users live, how passwords are hashed, when they are
   rotated and what a role means are application decisions with real
-  consequences — see [docs/auth.md](docs/auth.md#what-is-deliberately-not-here).
+  consequences — see [../auth/README.md](../auth/README.md#what-is-deliberately-not-here).
 - **No rate limiting, no CORS, no TLS configuration.** Those belong at the edge
   (reverse proxy, load balancer).
 - **No audit log.** `Logging` exists but is not wired to authentication. A

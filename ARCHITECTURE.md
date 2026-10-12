@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status: describes shipped code.** Verified against `502 tests, 1127 assertions`.
+> **Status: describes shipped code.** Verified against `473 tests, 1071 assertions`.
 > Planned changes are in [SPEC.md](SPEC.md).
 
 How a request flows through Empira, and why it is built this way.
@@ -191,7 +191,7 @@ cross-site page cannot forge it. The framework asks whether the answering guard
 is marked `NonAmbientCredential` — a property, not a class — so a module can add
 its own mechanism without CSRF growing an `instanceof` per mechanism.
 
-See [docs/auth.md](docs/auth.md).
+See [../auth/README.md](../auth/README.md).
 
 ## Testing strategy
 

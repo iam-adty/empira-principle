@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> **Status: describes shipped code.** Current behaviour, verified against `502 tests, 1127 assertions`.
+> **Status: describes shipped code.** Current behaviour, verified against `473 tests, 1071 assertions`.
 > Intended-but-unbuilt work lives in [SPEC.md](SPEC.md), marked `[planned]`.
 
 Guidance for AI agents and new contributors working in the Empira framework.
@@ -9,7 +9,15 @@ Guidance for AI agents and new contributors working in the Empira framework.
 
 A PHP framework where **htmx lives in PHP classes, not HTML attributes**. A component declares its state as a typed property and its behaviour as methods; the framework generates every `hx-*` attribute, the swap target, and a signed endpoint.
 
-It is not dependency-free, and no longer tries to be. The framework depends on `psr/log` and will depend on Doctrine: a dependency chosen deliberately for the boring, standardised things is worth more than a hand-rolled one that only this framework understands. What stays hand-written is the part that is the framework's actual subject — components, routing, views, and the htmx wiring.
+It is not dependency-free, and no longer tries to be. The framework depends on
+`psr/log` and Doctrine: a dependency chosen deliberately for the boring,
+standardised things is worth more than a hand-rolled one that only this framework
+understands. What stays hand-written is the part that is the framework's actual
+subject — components, routing, views, and the htmx wiring.
+
+What the framework does **not** do is assume an application needs a feature.
+Authentication is a module in [`../auth`](../auth), and this framework boots,
+serves requests, maps entities and runs migrations without it.
 
 ```
 namespace Empira;     PHP ^8.4, MIT
@@ -57,7 +65,7 @@ So:
 
 ## Where things live
 
-82 source files across 17 namespaces. The 17 files at `src/` root are the core; everything else is a subsystem.
+79 source files across 15 namespaces. The 19 files at `src/` root are the core; everything else is a subsystem.
 
 | Path | Responsibility |
 |---|---|
@@ -80,11 +88,11 @@ So:
 | `src/Container/` | Autowiring service container |
 | `src/Validation/` | `Validator`, `ErrorBag`, `ValidationException` |
 | `src/Config/` | `.env` parsing, dot-notation config, `DatabaseConfig` (the one reader for `DB_*`) |
-| `src/Auth/` | `Auth`, `Guard`, `UserProvider`, session/bearer guards, `RequireAuth`, and `User` — which is a Doctrine entity. **Becoming a module**: the read half (`user/check/guest/id/guard`) already lives in core as `Security\RequestUser`, and `Auth` is now only the write half (`login`/`logout`). |
 | `src/Persistence/` | `EntityManagerFactory` — the manager, and how it is built |
 | `src/Security/Csrf.php` | Session-backed CSRF for component actions |
 | `src/Security/{Identity,Guard,RequestUser,NonAmbientCredential}.php` | The contracts core keeps so authentication can be a module: *who* is this request, found by *what*, and was the credential ambient |
-| `src/Module.php` | `Module::register(Application)` — the one hook a module (like auth) plugs into |
+| `src/Module.php` | `Module::register(Application)` — the one hook a module plugs into |
+| `src/MigrationSource.php` | a module that ships its own migrations |
 | `src/Testing/` | `TestClient`, `TestResponse` |
 | `src/Console/` | CLI kernel, commands, and `Bootstrap` (finding a project's own commands) |
 
@@ -313,7 +321,8 @@ A change is done when:
 - [docs/routing.md](docs/routing.md) — the routing API that exists today
 - [docs/views.md](docs/views.md) — layouts, regions, fragments
 - [docs/data.md](docs/data.md) — the ORM, the EntityManager, migrations
-- [docs/auth.md](docs/auth.md) — who is asking, and CSRF exemptions
+- [docs/modules.md](docs/modules.md) — installing a module, and writing one
+- [../auth/README.md](../auth/README.md) — authentication, as a module
 - [docs/testing.md](docs/testing.md) — fixtures, conventions, the client
 - [docs/workers.md](docs/workers.md) — one boot, many requests, and what is reset
 - [docs/recipes.md](docs/recipes.md) — copy-pasteable how-tos

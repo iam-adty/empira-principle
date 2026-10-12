@@ -168,7 +168,7 @@ arrives after the refusal.
 `Auth` is bound per request rather than reset, so identity cannot survive into
 a request it does not belong to.
 
-See [docs/auth.md](docs/auth.md).
+See [../auth/README.md](../auth/README.md).
 
 ---
 
