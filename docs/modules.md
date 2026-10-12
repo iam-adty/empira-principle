@@ -139,4 +139,4 @@ tidiness and is a trap: `Auth` narrows `user()` to its own `User`, so a guard
 returning any other `Identity` is silently reported as *nobody*. PHP accepts the
 narrowing without complaint, and the symptom reads as a broken feature rather
 than as a type mistake. See the framework's
-[AGENTS.md](../AGENTS.md#known-traps).
+[AGENTS.md](../../dev/agents/principle.md#known-traps).

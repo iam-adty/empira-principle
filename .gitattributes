@@ -2,11 +2,17 @@
 # actually use: src/, docs/, and the licence. Everything else is for people
 # working *in* this repository.
 #
-# The skills are the clearest case. add-route/SKILL.md points at
-# tests/RoutingTest.php and describes this repository's layout — in someone
-# else's vendor/ directory that path does not exist and the instruction is
-# worse than absent. Contributors still get them from the git checkout.
-/.opencode      export-ignore
+# There used to be a `/.opencode` line here, for the agent skills. They are not
+# in this repository any more — they moved to `../dev/`, along with the
+# AGENTS.md and the planning files, because they are workspace material rather
+# than this package's. Nothing to ignore now: a path that is not here cannot be
+# exported.
+#
+# The reasoning behind that move is worth keeping: add-route/SKILL.md points at
+# tests/RoutingTest.php and describes a repository layout — in someone else's
+# vendor/ directory that path does not exist, and the instruction is worse than
+# absent. Keeping them out of the package is one half of that; putting them in a
+# sibling repository that a consumer never has is the other.
 /tests          export-ignore
 /tools          export-ignore
 /.editorconfig  export-ignore

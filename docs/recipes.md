@@ -2,8 +2,10 @@
 
 > **Status: describes shipped code.** Copy, paste, adapt.
 
-Each recipe here has a matching agent skill in `.opencode/skills/`, so the same
-guidance serves a person and an assistant.
+Each recipe here has a matching agent skill in `../dev/.opencode/skills/`, so the
+same guidance serves a person and an assistant. The skills are workspace
+material rather than part of this package — a consumer's `vendor/` directory has
+no use for instructions that point at `tests/RoutingTest.php`.
 
 ---
 
@@ -368,4 +370,4 @@ git stash pop && vendor/bin/phpunit tests/YourTest.php   # green
 - [views.md](views.md) — layouts and regions
 - [testing.md](testing.md) — testing conventions
 - [../SECURITY.md](../SECURITY.md) — before touching anything security-adjacent
-- [../AGENTS.md](../AGENTS.md) — known traps
+- [AGENTS.md](../../dev/agents/principle.md) — known traps

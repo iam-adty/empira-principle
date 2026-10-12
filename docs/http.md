@@ -228,4 +228,4 @@ and skips safe methods (`GET`, `HEAD`, `OPTIONS`, `TRACE`).
 
 - [SECURITY.md](../SECURITY.md) — the full security model
 - [docs/json-errors.md](json-errors.md) — the error envelope and the Accept matrix
-- [../SPEC.md](../SPEC.md) — planned work
+- [../../dev/planning/SPEC.md](../../dev/planning/SPEC.md) — planned work

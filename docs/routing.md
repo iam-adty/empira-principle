@@ -342,4 +342,4 @@ how a project registers its routes by hand.
 ## Further reading
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — where routing sits in the request
-- [../SPEC.md](../SPEC.md) — planned work
+- [../../dev/planning/SPEC.md](../../dev/planning/SPEC.md) — planned work

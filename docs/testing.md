@@ -206,4 +206,4 @@ protected function setUp(): void
 ## Further reading
 
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — the full pre-commit checklist
-- [../AGENTS.md](../AGENTS.md) — known traps
+- [AGENTS.md](../../dev/agents/principle.md) — known traps
