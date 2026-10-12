@@ -146,7 +146,7 @@ nothing. Caught by asserting /closed returns 403.
 Documentation must never describe software that does not exist.
 
 - `docs/` and [ARCHITECTURE.md](ARCHITECTURE.md) describe **shipped** behaviour only.
-- Intended work goes in [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md../), marked `[planned]`.
+- Intended work goes in [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md), marked `[planned]`.
 - When something ships: flip its marker, move its behaviour into the reference docs, add it to [CHANGELOG.md](CHANGELOG.md), remove it from [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md).
 
 The current test count appears in several documents. **If you add tests, update

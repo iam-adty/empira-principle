@@ -2,7 +2,7 @@
 
 > **Status: describes shipped code.** Copy, paste, adapt.
 
-Each recipe here has a matching agent skill in [`dev/`](https://github.com/iam-adty/empira-dev/blob/main/.opencode/skills/), so the
+Each recipe here has a matching agent skill in [`dev/`](https://github.com/iam-adty/empira-dev/tree/main/.opencode/skills/), so the
 same guidance serves a person and an assistant. The skills are workspace
 material rather than part of this package — a consumer's `vendor/` directory has
 no use for instructions that point at `tests/RoutingTest.php`.
@@ -370,4 +370,4 @@ git stash pop && vendor/bin/phpunit tests/YourTest.php   # green
 - [views.md](views.md) — layouts and regions
 - [testing.md](testing.md) — testing conventions
 - [../SECURITY.md](../SECURITY.md) — before touching anything security-adjacent
-- [AGENTS.md](https://github.com/iam-adty/empira-dev/blob/main/AGENTS.md../) — known traps
+- [AGENTS.md](https://github.com/iam-adty/empira-dev/blob/main/agents/principle.md) — known traps
