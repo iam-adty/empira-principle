@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth;
+namespace Empira\Auth;
 
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -21,7 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * One thing about the manager is worth stating, because it is the trap that
  * costs a day under a worker. A provider holds an `EntityManagerInterface` for
  * as long as the guard does — that is, for the life of the process. What keeps
- * that safe is not anything in this class; it is {@see \IamAdty\Empira\Application}
+ * that safe is not anything in this class; it is {@see \Empira\Application}
  * clearing the manager between requests. A provider that found a manager that
  * had *not* been cleared would hand back the previous request's user.
  */

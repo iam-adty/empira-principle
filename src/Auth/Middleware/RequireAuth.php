@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth\Middleware;
+namespace Empira\Auth\Middleware;
 
 use Closure;
-use IamAdty\Empira\Auth\Auth;
-use IamAdty\Empira\Http\Middleware;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Routing\HttpException;
+use Empira\Auth\Auth;
+use Empira\Http\Middleware;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Routing\HttpException;
 
 /**
  * Refuses a request that has no user behind it.
@@ -30,7 +30,7 @@ use IamAdty\Empira\Routing\HttpException;
 final class RequireAuth implements Middleware
 {
     /**
-     * Injected per request by {@see \IamAdty\Empira\Application}.
+     * Injected per request by {@see \Empira\Application}.
      *
      * Nullable so a middleware built by hand — in a test, or by a console
      * command — constructs rather than explodes. An `Auth` with no guards can

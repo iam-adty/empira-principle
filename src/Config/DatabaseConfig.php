@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Config;
+namespace Empira\Config;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;

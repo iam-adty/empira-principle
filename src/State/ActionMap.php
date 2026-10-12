@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\State;
+namespace Empira\State;
 
-use IamAdty\Empira\Attributes\Action;
-use IamAdty\Empira\Attributes\Verb;
-use IamAdty\Empira\Component;
+use Empira\Attributes\Action;
+use Empira\Attributes\Verb;
+use Empira\Component;
 use ReflectionClass;
 use ReflectionMethod;
 

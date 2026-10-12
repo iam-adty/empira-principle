@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Config\Env;
+use Empira\Config\Env;
 use PHPUnit\Framework\TestCase;
 
 final class EnvTest extends TestCase

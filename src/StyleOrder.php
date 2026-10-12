@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
 /**
  * Where a composite's own rules sit relative to the ones it collects.

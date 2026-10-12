@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Http;
+namespace Empira\Http;
 
 use Closure;
-use IamAdty\Empira\Container\Container;
+use Empira\Container\Container;
 
 /**
  * Runs a request through a stack of middleware.

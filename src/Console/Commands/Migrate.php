@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console\Commands;
+namespace Empira\Console\Commands;
 
 use Doctrine\Migrations\Configuration\Connection\ExistingConnection;
 use Doctrine\Migrations\Configuration\Migration\ConfigurationArray;
@@ -11,9 +11,9 @@ use Doctrine\Migrations\Exception\NoMigrationsToExecute;
 use Doctrine\Migrations\Metadata\MigrationPlanList;
 use Doctrine\Migrations\MigratorConfiguration;
 use Doctrine\Migrations\Version\Direction;
-use IamAdty\Empira\Config\DatabaseConfig;
-use IamAdty\Empira\Console\Command;
-use IamAdty\Empira\Console\Output;
+use Empira\Config\DatabaseConfig;
+use Empira\Console\Command;
+use Empira\Console\Output;
 
 /**
  * Runs the migrations in a project's `migrations/` directory, through Doctrine.

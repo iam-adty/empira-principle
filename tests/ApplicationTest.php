@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\ForbiddenActionException;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\InvalidTokenException;
-use IamAdty\Empira\Raw;
-use IamAdty\Empira\Tests\Fixtures\ChattyFixture;
-use IamAdty\Empira\Tests\Fixtures\CounterFixture;
-use IamAdty\Empira\Tests\Fixtures\MemoryStore;
-use IamAdty\Empira\Tests\Fixtures\NamedRootFixture;
-use IamAdty\Empira\Tests\Fixtures\StatefulFixture;
-use IamAdty\Empira\UnknownComponentException;
+use Empira\Application;
+use Empira\Element;
+use Empira\ForbiddenActionException;
+use Empira\Http\Request;
+use Empira\InvalidTokenException;
+use Empira\Raw;
+use Empira\Tests\Fixtures\ChattyFixture;
+use Empira\Tests\Fixtures\CounterFixture;
+use Empira\Tests\Fixtures\MemoryStore;
+use Empira\Tests\Fixtures\NamedRootFixture;
+use Empira\Tests\Fixtures\StatefulFixture;
+use Empira\UnknownComponentException;
 use PHPUnit\Framework\TestCase;
 
 final class ApplicationTest extends TestCase
@@ -232,9 +232,9 @@ final class ApplicationTest extends TestCase
     public function testFrameworkInternalsCannotBeExposedAsActions(): void
     {
         $app = $this->app();
-        $app->registry()->add(\IamAdty\Empira\Tests\Fixtures\BadActionFixture::class);
+        $app->registry()->add(\Empira\Tests\Fixtures\BadActionFixture::class);
 
-        $html = (string) $app->render(\IamAdty\Empira\Tests\Fixtures\BadActionFixture::class);
+        $html = (string) $app->render(\Empira\Tests\Fixtures\BadActionFixture::class);
         $url = $this->actionUrl($html, 'toHtml');
 
         $response = $app->handle($this->htmxRequest($url));
@@ -245,9 +245,9 @@ final class ApplicationTest extends TestCase
     public function testPrivateMethodsCannotBeReached(): void
     {
         $app = $this->app();
-        $app->registry()->add(\IamAdty\Empira\Tests\Fixtures\BadActionFixture::class);
+        $app->registry()->add(\Empira\Tests\Fixtures\BadActionFixture::class);
 
-        $html = (string) $app->render(\IamAdty\Empira\Tests\Fixtures\BadActionFixture::class);
+        $html = (string) $app->render(\Empira\Tests\Fixtures\BadActionFixture::class);
         $url = $this->actionUrl($html, 'secret');
 
         $response = $app->handle($this->htmxRequest($url));
@@ -360,15 +360,15 @@ final class ApplicationTest extends TestCase
 
         // The token carries the short alias, not the FQCN, so moving the class
         // to another namespace does not invalidate links already in the wild.
-        $identity = (new \IamAdty\Empira\TokenCodec(self::SECRET))->decode($token);
+        $identity = (new \Empira\TokenCodec(self::SECRET))->decode($token);
 
         $this->assertSame('counter', $identity['class']);
     }
 
     public function testExceptionClassesMapToTheRightStatusCodes(): void
     {
-        $this->assertTrue(is_subclass_of(InvalidTokenException::class, \IamAdty\Empira\Exception::class));
-        $this->assertTrue(is_subclass_of(UnknownComponentException::class, \IamAdty\Empira\Exception::class));
-        $this->assertTrue(is_subclass_of(ForbiddenActionException::class, \IamAdty\Empira\Exception::class));
+        $this->assertTrue(is_subclass_of(InvalidTokenException::class, \Empira\Exception::class));
+        $this->assertTrue(is_subclass_of(UnknownComponentException::class, \Empira\Exception::class));
+        $this->assertTrue(is_subclass_of(ForbiddenActionException::class, \Empira\Exception::class));
     }
 }

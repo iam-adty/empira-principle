@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth;
+namespace Empira\Auth;
 
 /**
  * Where users come from.

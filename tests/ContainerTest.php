@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Container\ContainerException;
+use Empira\Container\Container;
+use Empira\Container\ContainerException;
 use PHPUnit\Framework\TestCase;
 
 final class ContainerTest extends TestCase

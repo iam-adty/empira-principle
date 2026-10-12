@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console\Commands;
+namespace Empira\Console\Commands;
 
-use IamAdty\Empira\Console\Command;
-use IamAdty\Empira\Console\Output;
+use Empira\Console\Command;
+use Empira\Console\Output;
 
 /**
  * Writes a component class into `src/components`.
@@ -28,10 +28,10 @@ final class MakeComponent implements Command
 
     namespace {{NAMESPACE}};
 
-    use IamAdty\Empira\Attributes\Post;
-    use IamAdty\Empira\Attributes\Prop;
-    use IamAdty\Empira\Component;
-    use IamAdty\Empira\Element;
+    use Empira\Attributes\Post;
+    use Empira\Attributes\Prop;
+    use Empira\Component;
+    use Empira\Element;
 
     /**
      * {{CLASS}} — a component with one piece of state and one action.

@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Security\Csrf;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\Testing\TestClient;
-use IamAdty\Empira\Testing\TestResponse;
-use IamAdty\Empira\Tests\Fixtures\CounterFixture;
-use IamAdty\Empira\Tests\Fixtures\VerbsFixture;
+use Empira\Application;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Security\Csrf;
+use Empira\State\NullState;
+use Empira\Testing\TestClient;
+use Empira\Testing\TestResponse;
+use Empira\Tests\Fixtures\CounterFixture;
+use Empira\Tests\Fixtures\VerbsFixture;
 use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\TestCase;
 

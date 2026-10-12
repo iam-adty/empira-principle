@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
 /**
  * A route that matched, plus the parameters it captured.

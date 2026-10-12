@@ -11,10 +11,10 @@ generated.
 ```php
 namespace App\Components;
 
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Attributes\Prop;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
+use Empira\Attributes\Post;
+use Empira\Attributes\Prop;
+use Empira\Component;
+use Empira\Element;
 
 final class Counter extends Component
 {
@@ -258,7 +258,7 @@ parts without the parent knowing their URLs.
 **A nested component does not need registering.** This used to be the sharpest
 trap in the framework: `renderComponent()` built the child directly, so nothing
 looked wrong, but the token in its action URL named the class and was resolved
-through the {@see \IamAdty\Empira\Registry} when the button was pressed. An
+through the {@see \Empira\Registry} when the button was pressed. An
 unregistered nested component rendered perfectly and then answered 404 — a
 confusing way to find out, and paid for by applications that had to register
 every component they ever nested. `$app->components()` removes the

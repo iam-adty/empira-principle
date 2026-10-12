@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Console\Application;
-use IamAdty\Empira\Console\Output;
+use Empira\Console\Application;
+use Empira\Console\Output;
 use PHPUnit\Framework\TestCase;
 
 final class ConsoleTest extends TestCase
@@ -74,9 +74,9 @@ final class ConsoleTest extends TestCase
 
         $this->assertStringContainsString('declare(strict_types=1);', $contents);
         $this->assertStringContainsString('namespace App\Components;', $contents);
-        $this->assertStringContainsString('use IamAdty\Empira\Component;', $contents);
+        $this->assertStringContainsString('use Empira\Component;', $contents);
         $this->assertStringContainsString('final class Counter extends Component', $contents);
-        $this->assertStringContainsString('use IamAdty\Empira\Attributes\Prop;', $contents);
+        $this->assertStringContainsString('use Empira\Attributes\Prop;', $contents);
         $this->assertStringContainsString("#[Prop]\n    public int \$count = 0;", $contents);
         $this->assertStringContainsString("#[Post]\n    public function increment(): void", $contents);
         $this->assertStringContainsString("protected function render(): Element", $contents);
@@ -144,8 +144,8 @@ final class ConsoleTest extends TestCase
         $this->assertIsString($contents);
 
         $this->assertStringContainsString('namespace App\Controllers;', $contents);
-        $this->assertStringContainsString('use IamAdty\Empira\Routing\Controller;', $contents);
-        $this->assertStringContainsString('use IamAdty\Empira\Http\Response;', $contents);
+        $this->assertStringContainsString('use Empira\Routing\Controller;', $contents);
+        $this->assertStringContainsString('use Empira\Http\Response;', $contents);
         $this->assertStringContainsString('final class PostsController extends Controller', $contents);
         $this->assertStringContainsString('public function index(): Response', $contents);
     }
@@ -194,7 +194,7 @@ final class ConsoleTest extends TestCase
 
             declare(strict_types=1);
 
-            use IamAdty\Empira\Routing\RouteCollection;
+            use Empira\Routing\RouteCollection;
 
             return static function (RouteCollection $routes): void {
                 $routes->get('/', static fn(): string => 'home', 'home');
@@ -222,7 +222,7 @@ final class ConsoleTest extends TestCase
 
             declare(strict_types=1);
 
-            return static function (\IamAdty\Empira\Routing\RouteCollection $routes): void {
+            return static function (\Empira\Routing\RouteCollection $routes): void {
                 $routes->get('/', static fn(): string => 'home', 'home');
             };
             PHP);
@@ -282,9 +282,9 @@ final class ConsoleTest extends TestCase
 
             namespace Demo;
 
-            use IamAdty\Empira\Application;
-            use IamAdty\Empira\Routing\RouteCollection;
-            use IamAdty\Empira\State\NullState;
+            use Empira\Application;
+            use Empira\Routing\RouteCollection;
+            use Empira\State\NullState;
 
             final class App
             {
@@ -312,7 +312,7 @@ final class ConsoleTest extends TestCase
         $target = $this->tempdir();
         $empty = $target . '/routes.php';
 
-        file_put_contents($empty, "<?php\n\nreturn static fn(\\IamAdty\Empira\\Routing\\RouteCollection \$routes): null => null;\n");
+        file_put_contents($empty, "<?php\n\nreturn static fn(\\Empira\\Routing\\RouteCollection \$routes): null => null;\n");
 
         $result = $this->console(['empira', 'route:list', '--app=' . $empty]);
 

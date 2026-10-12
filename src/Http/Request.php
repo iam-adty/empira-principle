@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Http;
+namespace Empira\Http;
 
 /**
  * An inbound HTTP request with the htmx request headers surfaced.
@@ -120,7 +120,7 @@ public static function capture(bool $trustProxy = false): self
      * worse than none because it looks like data.
      *
      * Both are wrong by default and right by configuration, which is why
-     * {@see \IamAdty\Empira\Application::trustProxies()} exists.
+     * {@see \Empira\Application::trustProxies()} exists.
      *
      * Everything is validated. A malformed header, or a `REMOTE_ADDR` that is a
      * unix socket path rather than an address, returns null instead of

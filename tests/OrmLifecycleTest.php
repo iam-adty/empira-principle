@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Auth\DoctrineUserProvider;
-use IamAdty\Empira\Auth\User;
-use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\State\NullState;
+use Empira\Application;
+use Empira\Auth\DoctrineUserProvider;
+use Empira\Auth\User;
+use Empira\Config\Config;
+use Empira\Http\Request;
+use Empira\State\NullState;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -49,7 +49,7 @@ final class OrmLifecycleTest extends TestCase
         // than one connection can reach.
         $this->database = Temp::file('empira-orm-lifecycle-');
 
-        $this->entities = \IamAdty\Empira\Persistence\EntityManagerFactory::make(
+        $this->entities = \Empira\Persistence\EntityManagerFactory::make(
             new Config(['driver' => 'sqlite', 'database' => $this->database]),
             [__DIR__ . '/../src/Auth'],
         );
@@ -162,7 +162,7 @@ final class OrmLifecycleTest extends TestCase
         $app = new Application(self::SECRET, new NullState());
 
         $app->orm(['driver' => 'sqlite', 'database' => $this->database]);
-        $app->auth(new class($app->entities()) implements \IamAdty\Empira\Auth\Guard {
+        $app->auth(new class($app->entities()) implements \Empira\Auth\Guard {
             public function __construct(private readonly EntityManagerInterface $entities)
             {
             }
@@ -184,6 +184,6 @@ final class OrmLifecycleTest extends TestCase
         // being measured rather than a direct call to `clear()`.
         $app->handle($request);
 
-        return $app->container()->get(\IamAdty\Empira\Auth\Auth::class)->user()?->name();
+        return $app->container()->get(\Empira\Auth\Auth::class)->user()?->name();
     }
 }

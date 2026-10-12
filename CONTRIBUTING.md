@@ -92,10 +92,10 @@ the answer is "the same string", the assertion is worthless.
 ```php
 namespace App\Components;
 
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Attributes\Prop;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
+use Empira\Attributes\Post;
+use Empira\Attributes\Prop;
+use Empira\Component;
+use Empira\Element;
 
 final class Counter extends Component
 {

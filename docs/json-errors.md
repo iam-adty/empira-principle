@@ -107,7 +107,7 @@ When HTML is negotiated, behaviour is **byte-identical to today**.
 `default => 500`, and because it is not an `HttpException` it is **rethrown**:
 
 ```
-Fatal error: Uncaught IamAdty\Empira\Validation\ValidationException
+Fatal error: Uncaught Empira\Validation\ValidationException
 ```
 
 A controller that throws it today produces a fatal rather than a 422 — despite

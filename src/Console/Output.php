@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console;
+namespace Empira\Console;
 
 /**
  * Writes the four kinds of line a CLI needs, coloured only when a human is

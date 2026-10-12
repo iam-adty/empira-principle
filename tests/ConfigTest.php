@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Config\Config;
+use Empira\Config\Config;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigTest extends TestCase

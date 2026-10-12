@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\InvalidTokenException;
-use IamAdty\Empira\TokenCodec;
+use Empira\InvalidTokenException;
+use Empira\TokenCodec;
 use PHPUnit\Framework\TestCase;
 
 final class TokenCodecTest extends TestCase

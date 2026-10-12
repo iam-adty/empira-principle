@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Config;
+namespace Empira\Config;
 
 /**
  * Read-only configuration with dot-notation access.

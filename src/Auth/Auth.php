@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth;
+namespace Empira\Auth;
 
-use IamAdty\Empira\Http\Request;
+use Empira\Http\Request;
 
 /**
  * The guards, asked once per request.
@@ -16,7 +16,7 @@ use IamAdty\Empira\Http\Request;
  *     $auth->id();         // the id, or null
  *     $auth->guest();      // bool
  *
- * An instance is bound per request by {@see \IamAdty\Empira\Application}, so
+ * An instance is bound per request by {@see \Empira\Application}, so
  * there is nothing to reset and nothing to leak: a fresh instance cannot
  * remember the request before it. That is the whole reason it is not a
  * singleton.

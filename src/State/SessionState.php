@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\State;
+namespace Empira\State;
 
 /**
  * Keeps component props in the PHP session.

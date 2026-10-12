@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests\Fixtures;
+namespace Empira\Tests\Fixtures;
 
-use IamAdty\Empira\Attributes\Action;
-use IamAdty\Empira\Attributes\Delete;
-use IamAdty\Empira\Attributes\Get;
-use IamAdty\Empira\Attributes\Patch;
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Attributes\Prop;
-use IamAdty\Empira\Attributes\Put;
-use IamAdty\Empira\Attributes\Verb;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\State\StateStore;
+use Empira\Attributes\Action;
+use Empira\Attributes\Delete;
+use Empira\Attributes\Get;
+use Empira\Attributes\Patch;
+use Empira\Attributes\Post;
+use Empira\Attributes\Prop;
+use Empira\Attributes\Put;
+use Empira\Attributes\Verb;
+use Empira\Component;
+use Empira\Element;
+use Empira\State\StateStore;
 
 /**
  * A stateless counter: props travel inside the signed token.
@@ -473,9 +473,9 @@ interface Greeter
  * Every other fixture keeps its actions parameterless, so this is the one that
  * would notice if actions stopped being autowired.
  */
-final class ClockFixture extends \IamAdty\Empira\Component
+final class ClockFixture extends \Empira\Component
 {
-    #[\IamAdty\Empira\Attributes\Post]
+    #[\Empira\Attributes\Post]
     public function greet(Clock $clock): void
     {
         $this->with('greeting', 'good ' . $clock->partOfDay);
@@ -487,13 +487,13 @@ final class ClockFixture extends \IamAdty\Empira\Component
      * An interface with no binding, so this is the one action guaranteed to be
      * unresolvable — which is what makes the loud-failure assertion possible.
      */
-    #[\IamAdty\Empira\Attributes\Post]
+    #[\Empira\Attributes\Post]
     public function speak(Greeter $greeter): void
     {
         $this->with('greeting', $greeter->greeting());
     }
 
-    protected function render(): \IamAdty\Empira\Element
+    protected function render(): \Empira\Element
     {
         return $this->hx->div()
             ->id($this->id())
@@ -510,20 +510,20 @@ final class ClockFixture extends \IamAdty\Empira\Component
  * which is the swap target, so it comes back when htmx swaps this component
  * alone. A stylesheet in `<head>` would be gone by then.
  */
-final class StyledFixture extends \IamAdty\Empira\Component
+final class StyledFixture extends \Empira\Component
 {
-    #[\IamAdty\Empira\Attributes\Post]
+    #[\Empira\Attributes\Post]
     public function restyle(): void
     {
         $this->with('count', $this->intProp('count') + 1);
     }
 
-    protected function styles(): \IamAdty\Empira\Raw
+    protected function styles(): \Empira\Raw
     {
-        return \IamAdty\Empira\Raw::of('.styled-fixture { display: grid }');
+        return \Empira\Raw::of('.styled-fixture { display: grid }');
     }
 
-    protected function render(): \IamAdty\Empira\Element
+    protected function render(): \Empira\Element
     {
         return $this->hx->div()
             ->id($this->id())
@@ -536,18 +536,18 @@ final class StyledFixture extends \IamAdty\Empira\Component
 }
 
 /**
- * The same, but rendering a {@see \IamAdty\Empira\Raw} instead of an element,
+ * The same, but rendering a {@see \Empira\Raw} instead of an element,
  * which has no root to prepend into.
  */
-final class RawStyledFixture extends \IamAdty\Empira\Component
+final class RawStyledFixture extends \Empira\Component
 {
-    protected function styles(): \IamAdty\Empira\Raw
+    protected function styles(): \Empira\Raw
     {
-        return \IamAdty\Empira\Raw::of('.raw-styled-fixture { display: block }');
+        return \Empira\Raw::of('.raw-styled-fixture { display: block }');
     }
 
-    protected function render(): \IamAdty\Empira\Raw
+    protected function render(): \Empira\Raw
     {
-        return \IamAdty\Empira\Raw::of(sprintf('<p id="%s">raw</p>', $this->id()));
+        return \Empira\Raw::of(sprintf('<p id="%s">raw</p>', $this->id()));
     }
 }

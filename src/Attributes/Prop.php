@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Attributes;
+namespace Empira\Attributes;
 
 /**
  * Marks a property as component state that travels with the component.
@@ -30,7 +30,7 @@ namespace IamAdty\Empira\Attributes;
  * `private`, `static` and `readonly` ones are skipped, since state the
  * component cannot see is state the framework cannot round-trip.
  *
- * @see \IamAdty\Empira\State\PropBag for the reflection behind this
+ * @see \Empira\State\PropBag for the reflection behind this
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 final class Prop

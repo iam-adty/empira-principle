@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\View;
+namespace Empira\View;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\ElementFactory;
-use IamAdty\Empira\Raw;
+use Empira\Application;
+use Empira\Element;
+use Empira\ElementFactory;
+use Empira\Raw;
 
 /**
  * One swappable area of a page.

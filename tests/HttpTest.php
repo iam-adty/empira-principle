@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
+use Empira\Http\Request;
+use Empira\Http\Response;
 use PHPUnit\Framework\TestCase;
 
 final class HttpTest extends TestCase

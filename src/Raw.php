@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
 /**
  * A string that is emitted verbatim, bypassing escaping.

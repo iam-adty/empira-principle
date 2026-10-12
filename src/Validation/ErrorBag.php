@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Validation;
+namespace Empira\Validation;
 
 /**
  * Everything that went wrong, keyed by the field that caused it.

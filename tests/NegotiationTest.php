@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Format;
-use IamAdty\Empira\Http\Middleware\VerifyCsrfToken;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Routing\HttpException;
-use IamAdty\Empira\Security\Csrf;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\Validation\ValidationException;
-use IamAdty\Empira\Validation\Validator;
+use Empira\Application;
+use Empira\Http\Format;
+use Empira\Http\Middleware\VerifyCsrfToken;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Routing\HttpException;
+use Empira\Security\Csrf;
+use Empira\State\NullState;
+use Empira\Validation\ValidationException;
+use Empira\Validation\Validator;
 use PHPUnit\Framework\TestCase;
 
 /**

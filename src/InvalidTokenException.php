@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
 final class InvalidTokenException extends Exception
 {

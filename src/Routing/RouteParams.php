@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
 /**
  * The parameters a route matched, for the request in flight.

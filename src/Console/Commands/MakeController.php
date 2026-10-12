@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console\Commands;
+namespace Empira\Console\Commands;
 
-use IamAdty\Empira\Console\Command;
-use IamAdty\Empira\Console\Output;
+use Empira\Console\Command;
+use Empira\Console\Output;
 
 /**
  * Writes a controller class into `src/controllers`.
  *
- * The stub answers with a real {@see \IamAdty\Empira\Http\Response} rather than a TODO,
+ * The stub answers with a real {@see \Empira\Http\Response} rather than a TODO,
  * because a controller that returns nothing is a controller that cannot be run.
  */
 final class MakeController implements Command
@@ -26,8 +26,8 @@ final class MakeController implements Command
 
     namespace {{NAMESPACE}};
 
-    use IamAdty\Empira\Http\Response;
-    use IamAdty\Empira\Routing\Controller;
+    use Empira\Http\Response;
+    use Empira\Routing\Controller;
 
     /**
      * {{CLASS}} — handles the page traffic that is not a component action.

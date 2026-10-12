@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Console\Application as ConsoleApplication;
-use IamAdty\Empira\Console\Bootstrap;
-use IamAdty\Empira\Console\Command;
-use IamAdty\Empira\Console\Output;
-use IamAdty\Empira\Tests\Fixtures\MemoryStore;
+use Empira\Application;
+use Empira\Console\Application as ConsoleApplication;
+use Empira\Console\Bootstrap;
+use Empira\Console\Command;
+use Empira\Console\Output;
+use Empira\Tests\Fixtures\MemoryStore;
 use PHPUnit\Framework\TestCase;
 
 /**

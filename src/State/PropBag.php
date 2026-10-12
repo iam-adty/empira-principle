@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\State;
+namespace Empira\State;
 
-use IamAdty\Empira\Attributes\Prop;
+use Empira\Attributes\Prop;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionProperty;
@@ -15,7 +15,7 @@ use Traversable;
 /**
  * Reflects `#[Prop]` properties and moves state between them and a props array.
  *
- * The array is the wire format the {@see \IamAdty\Empira\TokenCodec} already signs, so
+ * The array is the wire format the {@see \Empira\TokenCodec} already signs, so
  * this class deliberately keeps that shape flat and unchanged: a typed property
  * is just a props entry with a default value and a type to coerce against.
  *

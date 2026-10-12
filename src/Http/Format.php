@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Http;
+namespace Empira\Http;
 
 /**
  * The representation a response should take for one request.

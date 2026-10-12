@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Config\DatabaseConfig;
-use IamAdty\Empira\Console\Application as ConsoleApplication;
-use IamAdty\Empira\Console\Output;
+use Empira\Config\Config;
+use Empira\Config\DatabaseConfig;
+use Empira\Console\Application as ConsoleApplication;
+use Empira\Console\Output;
 use PHPUnit\Framework\TestCase;
 
 /**

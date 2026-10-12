@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth;
+namespace Empira\Auth;
 
 /**
  * A guard over a list held in memory.
@@ -21,7 +21,7 @@ final class InMemoryUserProvider implements Guard
     {
     }
 
-    public function identify(\IamAdty\Empira\Http\Request $request): ?User
+    public function identify(\Empira\Http\Request $request): ?User
     {
         $id = $request->header('x-demo-user');
 

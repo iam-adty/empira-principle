@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Security\Csrf;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\Testing\TestClient;
-use IamAdty\Empira\Tests\Fixtures\AggregateFirstParentFixture;
-use IamAdty\Empira\Tests\Fixtures\AggregateParentFixture;
-use IamAdty\Empira\Tests\Fixtures\LazyParentFixture;
-use IamAdty\Empira\Tests\Fixtures\MixedParentFixture;
-use IamAdty\Empira\Tests\Fixtures\RawChildParentFixture;
-use IamAdty\Empira\Tests\Fixtures\StyledChildFixture;
+use Empira\Application;
+use Empira\Security\Csrf;
+use Empira\State\NullState;
+use Empira\Testing\TestClient;
+use Empira\Tests\Fixtures\AggregateFirstParentFixture;
+use Empira\Tests\Fixtures\AggregateParentFixture;
+use Empira\Tests\Fixtures\LazyParentFixture;
+use Empira\Tests\Fixtures\MixedParentFixture;
+use Empira\Tests\Fixtures\RawChildParentFixture;
+use Empira\Tests\Fixtures\StyledChildFixture;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,7 +31,7 @@ use PHPUnit\Framework\TestCase;
 final class StyleAggregationTest extends TestCase
 {
     private const SECRET = 'a-secret-that-is-long-enough';
-    private const FIXTURES = 'IamAdty\\Empira\\Tests\\Fixtures';
+    private const FIXTURES = 'Empira\\Tests\\Fixtures';
 
     private const CHILD_CSS = '.styled-child { color: teal; }';
     private const PARENT_CSS = '.aggregate-parent { border: 0; }';

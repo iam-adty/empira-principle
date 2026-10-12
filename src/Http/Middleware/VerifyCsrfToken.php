@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Http\Middleware;
+namespace Empira\Http\Middleware;
 
 use Closure;
-use IamAdty\Empira\Auth\Auth;
-use IamAdty\Empira\Http\Format;
-use IamAdty\Empira\Http\Middleware;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Html;
-use IamAdty\Empira\Routing\RouteCollection;
-use IamAdty\Empira\Security\Csrf;
+use Empira\Auth\Auth;
+use Empira\Http\Format;
+use Empira\Http\Middleware;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Html;
+use Empira\Routing\RouteCollection;
+use Empira\Security\Csrf;
 
 /**
  * Verifies the CSRF token on state-changing route requests.
  *
  * Component actions already verify themselves in
- * {@see \IamAdty\Empira\Component::beforeAction()}, so this is for ordinary
+ * {@see \Empira\Component::beforeAction()}, so this is for ordinary
  * controllers — a form post, a fetch call — which have no component lifecycle
  * to hook into.
  *

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Security;
+namespace Empira\Security;
 
-use IamAdty\Empira\ForbiddenActionException;
-use IamAdty\Empira\Http\Request;
+use Empira\ForbiddenActionException;
+use Empira\Http\Request;
 
 /**
  * Session-backed CSRF protection for component actions.

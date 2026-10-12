@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Validation;
+namespace Empira\Validation;
 
 /**
  * Checks an array of input against a set of rules and collects what failed.

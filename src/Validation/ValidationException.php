@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Validation;
+namespace Empira\Validation;
 
-use IamAdty\Empira\Exception;
+use Empira\Exception;
 
 /**
  * Thrown when input is not acceptable, carrying the reasons.

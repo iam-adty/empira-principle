@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
-use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Security\Csrf;
-use IamAdty\Empira\State\StateStore;
+use Empira\Container\Container;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Security\Csrf;
+use Empira\State\StateStore;
 
 /**
  * The per-request services handed to every component.

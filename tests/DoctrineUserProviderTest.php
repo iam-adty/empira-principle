@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use IamAdty\Empira\Auth\DoctrineUserProvider;
-use IamAdty\Empira\Auth\User;
-use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Persistence\EntityManagerFactory;
+use Empira\Auth\DoctrineUserProvider;
+use Empira\Auth\User;
+use Empira\Config\Config;
+use Empira\Persistence\EntityManagerFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The ORM-backed {@see \IamAdty\Empira\Auth\UserProvider}.
+ * The ORM-backed {@see \Empira\Auth\UserProvider}.
  *
  * These replace a set of tests that covered `DatabaseUserProvider`, which read
  * rows by hand. The assertions are deliberately the same four — find by id,

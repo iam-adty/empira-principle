@@ -32,10 +32,10 @@ public function isFragment(): bool
 namespace App;
 
 use App\Components\Counter;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\Raw;
-use IamAdty\Empira\View\Layout as BaseLayout;
-use IamAdty\Empira\View\Region;
+use Empira\Element;
+use Empira\Raw;
+use Empira\View\Layout as BaseLayout;
+use Empira\View\Region;
 
 final class Layout extends BaseLayout
 {

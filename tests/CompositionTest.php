@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\Testing\TestClient;
-use IamAdty\Empira\Tests\Fixtures\NestedChildFixture;
-use IamAdty\Empira\Tests\Fixtures\NestedParentFixture;
-use IamAdty\Empira\UnknownComponentException;
+use Empira\Application;
+use Empira\State\NullState;
+use Empira\Testing\TestClient;
+use Empira\Tests\Fixtures\NestedChildFixture;
+use Empira\Tests\Fixtures\NestedParentFixture;
+use Empira\UnknownComponentException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
 final class CompositionTest extends TestCase
 {
     private const SECRET = 'a-secret-that-is-long-enough';
-    private const FIXTURES = 'IamAdty\\Empira\\Tests\\Fixtures';
+    private const FIXTURES = 'Empira\\Tests\\Fixtures';
 
     protected function setUp(): void
     {

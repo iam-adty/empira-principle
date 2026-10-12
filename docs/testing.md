@@ -18,7 +18,7 @@ starts a server.
 The fastest way to drive an application:
 
 ```php
-use IamAdty\Empira\Testing\TestClient;
+use Empira\Testing\TestClient;
 
 $client = new TestClient($app);
 
@@ -102,7 +102,7 @@ Shared fixtures live in `tests/Fixtures/Components.php` and are loaded via
 
 ## Conventions
 
-- `final class XTest extends TestCase`, in `namespace IamAdty\Empira\Tests;`
+- `final class XTest extends TestCase`, in `namespace Empira\Tests;`
 - Method names read as behaviour: `testATypedPropertyMutatesAcrossRequests`
 - `assertSame` over `assertEquals`
 - Fixtures are defined at the **bottom of the test file**, or in `Fixtures/` when shared.

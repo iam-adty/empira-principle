@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Http;
+namespace Empira\Http;
 
-use IamAdty\Empira\Html;
+use Empira\Html;
 
 /**
  * An outbound HTTP response with fluent `HX-*` header helpers.

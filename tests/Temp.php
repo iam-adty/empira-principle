@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
 /**
  * Scratch files, inside the workspace rather than the system temp directory.

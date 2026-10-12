@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
 /**
  * The set of components a token may resolve to.

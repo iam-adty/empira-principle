@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
-use IamAdty\Empira\Attributes\Verb;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
+use Empira\Attributes\Verb;
+use Empira\Http\Request;
+use Empira\Http\Response;
 use ReflectionMethod;
 
 /**

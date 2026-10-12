@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Registry;
-use IamAdty\Empira\State\StateStore;
-use IamAdty\Empira\Tests\Fixtures\CounterFixture;
-use IamAdty\Empira\Tests\Fixtures\MemoryStore;
-use IamAdty\Empira\Tests\Fixtures\UnregisteredFixture;
-use IamAdty\Empira\UnknownComponentException;
+use Empira\Registry;
+use Empira\State\StateStore;
+use Empira\Tests\Fixtures\CounterFixture;
+use Empira\Tests\Fixtures\MemoryStore;
+use Empira\Tests\Fixtures\UnregisteredFixture;
+use Empira\UnknownComponentException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -21,7 +21,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class RegistryTest extends TestCase
 {
-    private const FIXTURES = 'IamAdty\\Empira\\Tests\\Fixtures';
+    private const FIXTURES = 'Empira\\Tests\\Fixtures';
 
     // ------------------------------------------------------------- aliases
 
@@ -77,7 +77,7 @@ final class RegistryTest extends TestCase
 
     public function testASubNamespaceOfAnAllowedOneIsIncluded(): void
     {
-        $registry = (new Registry())->allowNamespace('IamAdty\\Empira');
+        $registry = (new Registry())->allowNamespace('Empira');
 
         self::assertSame(CounterFixture::class, $registry->resolve(CounterFixture::class));
     }
@@ -88,7 +88,7 @@ final class RegistryTest extends TestCase
         // test would admit the whole second directory. The trailing separator
         // `allowNamespace()` appends is what stops it — and this is the mistake
         // that would quietly widen the boundary to a directory nobody named.
-        $registry = (new Registry())->allowNamespace('IamAdty\\Empira\\Tests\\Fixture');
+        $registry = (new Registry())->allowNamespace('Empira\\Tests\\Fixture');
 
         self::expectException(UnknownComponentException::class);
 
@@ -167,6 +167,6 @@ final class RegistryTest extends TestCase
         // `MemoryStore` ever stopped being a `StateStore`, `testANonComponentIn
         // AnAllowedNamespaceIsStillRefused` would stop proving what its name says.
         self::assertTrue(is_a(MemoryStore::class, StateStore::class, true));
-        self::assertFalse(is_a(MemoryStore::class, \IamAdty\Empira\Component::class, true));
+        self::assertFalse(is_a(MemoryStore::class, \Empira\Component::class, true));
     }
 }

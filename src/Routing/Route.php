@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
-use IamAdty\Empira\Attributes\Verb;
+use Empira\Attributes\Verb;
 
 /**
  * One route: a method, a path pattern, and whatever handles it.

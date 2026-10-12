@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console\Commands;
+namespace Empira\Console\Commands;
 
 use Closure;
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Console\Command;
-use IamAdty\Empira\Console\Output;
-use IamAdty\Empira\Routing\Route;
-use IamAdty\Empira\Routing\RouteCollection;
+use Empira\Application;
+use Empira\Console\Command;
+use Empira\Console\Output;
+use Empira\Routing\Route;
+use Empira\Routing\RouteCollection;
 
 /**
  * Prints the route table of an application.

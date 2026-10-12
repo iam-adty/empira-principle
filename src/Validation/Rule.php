@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Validation;
+namespace Empira\Validation;
 
 /**
  * The rules a validator knows, and nothing else.

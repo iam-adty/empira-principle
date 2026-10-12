@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console\Commands;
+namespace Empira\Console\Commands;
 
-use IamAdty\Empira\Console\Command;
-use IamAdty\Empira\Console\Output;
+use Empira\Console\Command;
+use Empira\Console\Output;
 
 /**
  * Runs the PHP built-in web server against an application's `public/`.

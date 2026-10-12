@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
 /**
  * Signs component identity into an opaque, tamper-proof token.

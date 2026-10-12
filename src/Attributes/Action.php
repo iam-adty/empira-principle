@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Attributes;
+namespace Empira\Attributes;
 
 /**
  * Exposes a component method to htmx as an action.

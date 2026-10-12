@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Raw;
+use Empira\Application;
+use Empira\Container\Container;
+use Empira\Element;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Raw;
 
 /**
  * The base class for ordinary page controllers.

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Tests\Fixtures\MemoryStore;
+use Empira\Application;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Tests\Fixtures\MemoryStore;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
@@ -155,7 +155,7 @@ final class LoggingTest extends TestCase
         // A 404 is the client's doing and is not an incident. Logging every one
         // of them buries the 500s in routine noise.
         $app->fallback(function (): string {
-            throw new \IamAdty\Empira\Routing\HttpException(404, 'not here');
+            throw new \Empira\Routing\HttpException(404, 'not here');
         });
 
         $response = $app->handle(new Request('GET', '/missing'));

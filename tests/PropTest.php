@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Registry;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\State\PropBag;
-use IamAdty\Empira\Tests\Fixtures\MemoryStore;
-use IamAdty\Empira\Tests\Fixtures\ObjectPropFixture;
-use IamAdty\Empira\Tests\Fixtures\TypedPropsFixture;
-use IamAdty\Empira\Tests\Fixtures\TypedStatefulFixture;
+use Empira\Application;
+use Empira\Http\Request;
+use Empira\Registry;
+use Empira\State\NullState;
+use Empira\State\PropBag;
+use Empira\Tests\Fixtures\MemoryStore;
+use Empira\Tests\Fixtures\ObjectPropFixture;
+use Empira\Tests\Fixtures\TypedPropsFixture;
+use Empira\Tests\Fixtures\TypedStatefulFixture;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -243,11 +243,11 @@ final class PropTest extends TestCase
     public function testPropBagIgnoresPropertiesItCannotWrite(): void
     {
         $component = new TypedPropsFixture(
-            new \IamAdty\Empira\Context(
+            new \Empira\Context(
                 request: new Request('GET', '/'),
-                response: new \IamAdty\Empira\Http\Response(),
+                response: new \Empira\Http\Response(),
                 registry: $this->registry,
-                tokens: new \IamAdty\Empira\TokenCodec(self::SECRET),
+                tokens: new \Empira\TokenCodec(self::SECRET),
                 state: new NullState(),
                 baseUrl: '/empira',
             )
@@ -265,10 +265,10 @@ final class PropTest extends TestCase
     public function testPropBagFlushLeavesUninitialisedPropertiesOut(): void
     {
         $subject = new class () {
-            #[\IamAdty\Empira\Attributes\Prop]
+            #[\Empira\Attributes\Prop]
             public array $untouched;
 
-            #[\IamAdty\Empira\Attributes\Prop]
+            #[\Empira\Attributes\Prop]
             public string $named = 'value';
         };
 

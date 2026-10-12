@@ -38,10 +38,10 @@ declare(strict_types=1);
 
 namespace App\Components;
 
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Attributes\Prop;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
+use Empira\Attributes\Post;
+use Empira\Attributes\Prop;
+use Empira\Component;
+use Empira\Element;
 
 final class TodoList extends Component
 {

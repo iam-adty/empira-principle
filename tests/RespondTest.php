@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Tests\Fixtures\MemoryStore;
+use Empira\Application;
+use Empira\Http\Request;
+use Empira\Tests\Fixtures\MemoryStore;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -143,7 +143,7 @@ final class RespondTest extends TestCase
     public function testAFallbackReturningAResponseIsEmittedNotSent(): void
     {
         $app = new Application(self::SECRET, new MemoryStore());
-        $app->fallback(fn(): \IamAdty\Empira\Http\Response => \IamAdty\Empira\Http\Response::html('from a response', 201));
+        $app->fallback(fn(): \Empira\Http\Response => \Empira\Http\Response::html('from a response', 201));
 
         ob_start();
         $app->respond(new Request('GET', '/created'));

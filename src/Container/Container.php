@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Container;
+namespace Empira\Container;
 
 use ReflectionFunction;
 use ReflectionIntersectionType;

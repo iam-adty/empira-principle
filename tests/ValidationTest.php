@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Validation\ErrorBag;
-use IamAdty\Empira\Validation\Rule;
-use IamAdty\Empira\Validation\ValidationException;
-use IamAdty\Empira\Validation\Validator;
+use Empira\Validation\ErrorBag;
+use Empira\Validation\Rule;
+use Empira\Validation\ValidationException;
+use Empira\Validation\Validator;
 use PHPUnit\Framework\TestCase;
 
 final class ValidationTest extends TestCase
@@ -493,7 +493,7 @@ final class ValidationTest extends TestCase
         $this->assertSame($errors, $exception->errors());
         $this->assertSame(422, $exception->status);
         $this->assertSame('Validation failed for: email.', $exception->getMessage());
-        $this->assertInstanceOf(\IamAdty\Empira\Exception::class, $exception);
+        $this->assertInstanceOf(\Empira\Exception::class, $exception);
         $this->assertInstanceOf(\RuntimeException::class, $exception);
     }
 

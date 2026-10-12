@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Attributes\Route;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Routing\Controller;
-use IamAdty\Empira\Routing\RouteCollection;
-use IamAdty\Empira\Routing\RouteParams;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\View\Layout;
-use IamAdty\Empira\View\Region;
+use Empira\Application;
+use Empira\Attributes\Route;
+use Empira\Http\Request;
+use Empira\Routing\Controller;
+use Empira\Routing\RouteCollection;
+use Empira\Routing\RouteParams;
+use Empira\State\NullState;
+use Empira\View\Layout;
+use Empira\View\Region;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -90,7 +90,7 @@ final class RouteDiscoveryTest extends TestCase
 
         // Fixtures are written without imports so each one reads as a single
         // block; Region is the only type they all need.
-        $body = "use IamAdty\Empira\View\\Region;\n\n" . $body;
+        $body = "use Empira\View\\Region;\n\n" . $body;
 
         file_put_contents($path, sprintf(
             "<?php\n\ndeclare(strict_types=1);\n\nnamespace %s;\n\n%s\n",
@@ -108,8 +108,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testAClassLevelRouteRendersThatLayout(): void
     {
         $this->write('HomeLayout.php', 'Empira\Fixtures\HomeLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/', name: 'home')]
             final class HomeLayout extends Layout
@@ -133,9 +133,9 @@ final class RouteDiscoveryTest extends TestCase
     public function testAMethodLevelRouteCallsThatMethod(): void
     {
         $this->write('PingController.php', 'Empira\Fixtures\PingController', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\Http\Response;
-            use IamAdty\Empira\Routing\Controller;
+            use Empira\Attributes\Route;
+            use Empira\Http\Response;
+            use Empira\Routing\Controller;
 
             final class PingController extends Controller
             {
@@ -155,8 +155,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testARouteIsRepeatableForSeveralUrls(): void
     {
         $this->write('MultiLayout.php', 'Empira\Fixtures\MultiLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/one', name: 'one')]
             #[Route('/two', name: 'two')]
@@ -178,9 +178,9 @@ final class RouteDiscoveryTest extends TestCase
     public function testTheAttributeMethodIsHonoured(): void
     {
         $this->write('OnlyPost.php', 'Empira\Fixtures\OnlyPost', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\Http\Response;
-            use IamAdty\Empira\Routing\Controller;
+            use Empira\Attributes\Route;
+            use Empira\Http\Response;
+            use Empira\Routing\Controller;
 
             final class OnlyPost extends Controller
             {
@@ -203,9 +203,9 @@ final class RouteDiscoveryTest extends TestCase
         // Two files; the general one sorts first on disk. The specific route
         // must still win, or renaming a file would produce a silent 404.
         $this->write('ZTodosLayout.php', 'Empira\Fixtures\ZTodosLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\Routing\RouteParams;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\Routing\RouteParams;
+            use Empira\View\Layout;
 
             #[Route('/todos/{id}')]
             final class ZTodosLayout extends Layout
@@ -218,8 +218,8 @@ final class RouteDiscoveryTest extends TestCase
             PHP);
 
         $this->write('ATodosNewLayout.php', 'Empira\Fixtures\ATodosNewLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/todos/new')]
             final class ATodosNewLayout extends Layout
@@ -240,8 +240,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testAPriorityOverridesSpecificity(): void
     {
         $this->write('Pinned.php', 'Empira\Fixtures\Pinned', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/pinned/{id}', priority: 10)]
             final class Pinned extends Layout
@@ -254,8 +254,8 @@ final class RouteDiscoveryTest extends TestCase
             PHP);
 
         $this->write('PinnedStatic.php', 'Empira\Fixtures\PinnedStatic', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/pinned/static')]
             final class PinnedStatic extends Layout
@@ -276,8 +276,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testAFileWhoseClassDoesNotMatchItsPathIsSkipped(): void
     {
         $this->write('GoodLayout.php', 'Empira\Fixtures\GoodLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/good')]
             final class GoodLayout extends Layout
@@ -292,7 +292,7 @@ final class RouteDiscoveryTest extends TestCase
         // The path says Mismatched, the file says DoesNotExist. Discovery asks
         // for the class the path implies, which nothing can load.
         $this->write('Mismatched.php', 'Empira\Fixtures\DoesNotExist', <<<'PHP'
-            use IamAdty\Empira\View\Layout;
+            use Empira\View\Layout;
 
             final class DoesNotExist extends Layout
             {
@@ -316,9 +316,9 @@ final class RouteDiscoveryTest extends TestCase
     public function testMountReceivesRouteParametersByName(): void
     {
         $this->write('TodoLayout.php', 'Empira\Fixtures\TodoLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\Routing\RouteParams;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\Routing\RouteParams;
+            use Empira\View\Layout;
 
             #[Route('/todos/{id}')]
             final class TodoLayout extends Layout
@@ -345,9 +345,9 @@ final class RouteDiscoveryTest extends TestCase
     public function testMountReceivesAutowiredDependencies(): void
     {
         $this->write('InjectedLayout.php', 'Empira\Fixtures\InjectedLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\Routing\RouteParams;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\Routing\RouteParams;
+            use Empira\View\Layout;
 
             #[Route('/injected')]
             final class InjectedLayout extends Layout
@@ -374,8 +374,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testALayoutWithoutMountStillRenders(): void
     {
         $this->write('PlainLayout.php', 'Empira\Fixtures\PlainLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/plain')]
             final class PlainLayout extends Layout
@@ -420,9 +420,9 @@ final class RouteDiscoveryTest extends TestCase
     {
         $this->write('Blocker.php', 'Empira\\Fixtures\\Blocker', <<<'PHP'
             use Closure;
-            use IamAdty\Empira\Http\Middleware;
-            use IamAdty\Empira\Http\Request;
-            use IamAdty\Empira\Http\Response;
+            use Empira\Http\Middleware;
+            use Empira\Http\Request;
+            use Empira\Http\Response;
 
             final class Blocker implements Middleware
             {
@@ -434,8 +434,8 @@ final class RouteDiscoveryTest extends TestCase
             PHP);
 
         $this->write('SecuredLayout.php', 'Empira\\Fixtures\\SecuredLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/secret', middleware: [Blocker::class])]
             final class SecuredLayout extends Layout
@@ -458,8 +458,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testAbstractAndNonInstantiableClassesAreSkipped(): void
     {
         $this->write('AbstractPage.php', 'Empira\\Fixtures\\AbstractPage', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/abstract')]
             abstract class AbstractPage extends Layout
@@ -472,8 +472,8 @@ final class RouteDiscoveryTest extends TestCase
             PHP);
 
         $this->write('PrivatePage.php', 'Empira\\Fixtures\\PrivatePage', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/private')]
             final class PrivatePage extends Layout
@@ -499,8 +499,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testANameIsDerivedWhenTheAttributeOmitsOne(): void
     {
         $this->write('Pages/HomeLayout.php', 'App\Pages\HomeLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/derived')]
             final class HomeLayout extends Layout
@@ -513,7 +513,7 @@ final class RouteDiscoveryTest extends TestCase
             PHP);
 
         $this->write('Controllers/TodoController.php', 'App\Controllers\TodoController', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
+            use Empira\Attributes\Route;
 
             final class TodoController
             {
@@ -534,8 +534,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testExplicitDataOverridesRouteParameters(): void
     {
         $this->write('EchoLayout.php', 'Empira\\Fixtures\\EchoLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/echo/{id}')]
             final class EchoLayout extends Layout
@@ -562,8 +562,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testAnExplicitNameWins(): void
     {
         $this->write('NamedLayout.php', 'Empira\Fixtures\NamedLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/named', name: 'explicit.name')]
             final class NamedLayout extends Layout
@@ -583,9 +583,9 @@ final class RouteDiscoveryTest extends TestCase
     public function testOneRouteCanAnswerSeveralVerbs(): void
     {
         $this->write('SubmitController.php', 'Empira\Fixtures\SubmitController', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\Http\Response;
-            use IamAdty\Empira\Routing\Controller;
+            use Empira\Attributes\Route;
+            use Empira\Http\Response;
+            use Empira\Routing\Controller;
 
             final class SubmitController extends Controller
             {
@@ -621,8 +621,8 @@ final class RouteDiscoveryTest extends TestCase
     public function testRouteParametersDoNotLeakIntoTheNextRequest(): void
     {
         $this->write('TodoLayout.php', 'Empira\\Fixtures\\TodoLayout', <<<'PHP'
-            use IamAdty\Empira\Attributes\Route;
-            use IamAdty\Empira\View\Layout;
+            use Empira\Attributes\Route;
+            use Empira\View\Layout;
 
             #[Route('/todos/{id}')]
             final class TodoLayout extends Layout

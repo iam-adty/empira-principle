@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\View;
+namespace Empira\View;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\ElementFactory;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Session;
-use IamAdty\Empira\Raw;
-use IamAdty\Empira\Security\Csrf;
+use Empira\Application;
+use Empira\Element;
+use Empira\ElementFactory;
+use Empira\Http\Request;
+use Empira\Http\Session;
+use Empira\Raw;
+use Empira\Security\Csrf;
 
 /**
  * The page shell — the one place that looks like a template.

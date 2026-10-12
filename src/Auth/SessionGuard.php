@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth;
+namespace Empira\Auth;
 
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Session;
-use IamAdty\Empira\Http\SessionId;
+use Empira\Http\Request;
+use Empira\Http\Session;
+use Empira\Http\SessionId;
 
 /**
  * Signs a user in with the session.
@@ -14,7 +14,7 @@ use IamAdty\Empira\Http\SessionId;
  * The session cookie is an *ambient* credential: the browser attaches it to
  * every request to this site without being asked. That is what makes a session
  * convenient and what makes CSRF protection necessary, and it is why this
- * guard is the one {@see \IamAdty\Empira\Http\Middleware\VerifyCsrfToken} will
+ * guard is the one {@see \Empira\Http\Middleware\VerifyCsrfToken} will
  * not exempt.
  *
  *     $app->auth(new SessionGuard($session, $users));

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Testing;
+namespace Empira\Testing;
 
-use IamAdty\Empira\Http\Response;
+use Empira\Http\Response;
 use PHPUnit\Framework\Assert;
 
 /**
@@ -21,10 +21,10 @@ use PHPUnit\Framework\Assert;
  *         ->assertDontSee('Buy bread');
  *
  * Header lookups are case-insensitive, matching what a browser and the
- * framework's own {@see \IamAdty\Empira\Http\Request} do, so `assertHeader('hx-trigger',
+ * framework's own {@see \Empira\Http\Request} do, so `assertHeader('hx-trigger',
  * ...)` does not depend on how the component happened to capitalise it.
  *
- * @see \IamAdty\Empira\Testing\TestClient
+ * @see \Empira\Testing\TestClient
  */
 final class TestResponse
 {

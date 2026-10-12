@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Auth\Auth;
-use IamAdty\Empira\Auth\BearerGuard;
-use IamAdty\Empira\Auth\Guard;
-use IamAdty\Empira\Auth\Middleware\RequireAuth;
-use IamAdty\Empira\Auth\SessionGuard;
-use IamAdty\Empira\Auth\User;
-use IamAdty\Empira\Auth\UserProvider;
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Middleware\VerifyCsrfToken;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
+use Empira\Auth\Auth;
+use Empira\Auth\BearerGuard;
+use Empira\Auth\Guard;
+use Empira\Auth\Middleware\RequireAuth;
+use Empira\Auth\SessionGuard;
+use Empira\Auth\User;
+use Empira\Auth\UserProvider;
+use Empira\Application;
+use Empira\Http\Middleware\VerifyCsrfToken;
+use Empira\Http\Request;
+use Empira\Http\Response;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,7 +31,7 @@ final class AuthTest extends TestCase
 
     private function app(): Application
     {
-        return new Application(self::SECRET, new \IamAdty\Empira\State\NullState());
+        return new Application(self::SECRET, new \Empira\State\NullState());
     }
 
     /**
@@ -264,7 +264,7 @@ final class AuthTest extends TestCase
         // change would prove nothing. This asserts the rotation is *asked for*,
         // which is the part under our control and the part that would otherwise
         // go untested.
-        $rotator = new class implements \IamAdty\Empira\Http\SessionId {
+        $rotator = new class implements \Empira\Http\SessionId {
             public int $rotated = 0;
 
             public function regenerate(): void
@@ -273,7 +273,7 @@ final class AuthTest extends TestCase
             }
         };
 
-        $session = new \IamAdty\Empira\Http\Session('auth-test', false);
+        $session = new \Empira\Http\Session('auth-test', false);
         $guard = new SessionGuard($session, $this->users(), rotator: $rotator);
 
         $this->assertSame(0, $rotator->rotated);
@@ -311,7 +311,7 @@ final class AuthTest extends TestCase
         // ambient cookie is exactly what CSRF exists to defend, so a
         // session-authenticated POST with no token has to stay refused.
         $app = $this->app();
-        $app->csrf(new \IamAdty\Empira\Security\Csrf());
+        $app->csrf(new \Empira\Security\Csrf());
         $app->routes()->post('/api', static fn(): string => 'ok', 'api');
         $app->auth(new SessionGuard($app->session(), $this->users()));
         $app->use(VerifyCsrfToken::class);
@@ -367,7 +367,7 @@ final class AuthTest extends TestCase
     private function guardedApp(Guard $guard): Application
     {
         $app = $this->app();
-        $app->csrf(new \IamAdty\Empira\Security\Csrf());
+        $app->csrf(new \Empira\Security\Csrf());
         $app->routes()->post('/api', static fn(): string => 'ok', 'api');
         $app->auth($guard);
         $app->use(VerifyCsrfToken::class);

@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Attributes\Verb;
-use IamAdty\Empira\Container\ContainerException;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\Tests\Fixtures\ActionOverrideFixture;
-use IamAdty\Empira\Tests\Fixtures\Clock;
-use IamAdty\Empira\Tests\Fixtures\ClockFixture;
-use IamAdty\Empira\Tests\Fixtures\MixedActionsFixture;
-use IamAdty\Empira\Tests\Fixtures\RawStyledFixture;
-use IamAdty\Empira\Tests\Fixtures\StyledFixture;
-use IamAdty\Empira\Tests\Fixtures\UnsafeAttributeFixture;
-use IamAdty\Empira\Tests\Fixtures\VerbsFixture;
+use Empira\Application;
+use Empira\Attributes\Verb;
+use Empira\Container\ContainerException;
+use Empira\Http\Request;
+use Empira\State\NullState;
+use Empira\Tests\Fixtures\ActionOverrideFixture;
+use Empira\Tests\Fixtures\Clock;
+use Empira\Tests\Fixtures\ClockFixture;
+use Empira\Tests\Fixtures\MixedActionsFixture;
+use Empira\Tests\Fixtures\RawStyledFixture;
+use Empira\Tests\Fixtures\StyledFixture;
+use Empira\Tests\Fixtures\UnsafeAttributeFixture;
+use Empira\Tests\Fixtures\VerbsFixture;
 use PHPUnit\Framework\TestCase;
 
 /**

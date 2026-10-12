@@ -12,7 +12,7 @@ A PHP framework where **htmx lives in PHP classes, not HTML attributes**. A comp
 It is not dependency-free, and no longer tries to be. The framework depends on `psr/log` and will depend on Doctrine: a dependency chosen deliberately for the boring, standardised things is worth more than a hand-rolled one that only this framework understands. What stays hand-written is the part that is the framework's actual subject — components, routing, views, and the htmx wiring.
 
 ```
-namespace IamAdty\Empira;     PHP ^8.4, MIT
+namespace Empira;     PHP ^8.4, MIT
 ```
 
 ## Commands
@@ -268,7 +268,19 @@ The habit that survives: **read the summary line, not the exit status.** Any exi
 
 **`Response::html()` used to discard a second argument.** PHP silently drops extra arguments to a function that does not declare them, so `Response::html('x', 406)` returned a 200. Fixed in `456b960` — it now takes `$status`. Still worth knowing when a status quietly goes missing.
 
-**The `Empira\` → `IamAdty\Empira\` rename was a one-time migration.** 336 occurrences, done. The technique generalises — a negative lookbehind (`(?<!IamAdty\\)Empira\\`) makes a search-and-replace idempotent, where a second pass would double-prefix everything — but it is not a live hazard here.
+**A namespace rename has a second population the obvious pattern cannot see.** Dropping
+`IamAdty` from `IamAdty\Empira` was one substitution over 115 files — and it silently
+missed every *string literal* holding an escaped namespace, because those carry
+**two** backslashes (`'IamAdty\\Empira\\Tests\\Fixtures'`) and a pattern for one
+backslash does not match them. Worse, the fix-up pass then produced
+`Empira\\Empira\\…`, because the original already contained the replacement text just
+past the prefix it matched. The lesson is not "be careful with sed" — it is that a
+search-and-replace is only done when you have looked at what it *missed*. `grep -rn`
+for the old name over **every** file type, not just the ones you meant to edit, and
+trust the zero, is the only part of the rename that was doing any work.
+
+`composer validate` and the full suite are the other half: an autoload map that no
+longer matches the namespaces in the tree fails at runtime, not at rename time.
 
 ### Not repository-specific
 

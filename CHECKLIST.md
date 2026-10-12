@@ -57,7 +57,7 @@ Current: **487 framework tests / 1097 assertions**, **45 app tests / 128 asserti
 
 ### Packaging — 2026-10-11
 - ~~Split into two Composer packages: `principle/` (library) and `app/` (project)~~
-- ~~Namespace `Empira\` → `IamAdty\Empira\`~~
+- ~~Namespace `Empira\` → `Empira\`~~
 - ~~`app` links the library through `franzl/studio` (`dev-main`)~~
 - ~~Two git repositories, one per package~~
 

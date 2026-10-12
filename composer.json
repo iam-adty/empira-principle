@@ -22,7 +22,7 @@
     },
     "autoload": {
         "psr-4": {
-            "IamAdty\\Empira\\": "src/"
+            "Empira\\": "src/"
         },
         "files": [
             "src/functions.php"
@@ -30,7 +30,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "IamAdty\\Empira\\Tests\\": "tests/"
+            "Empira\\Tests\\": "tests/"
         },
         "classmap": [
             "tests/Fixtures/"

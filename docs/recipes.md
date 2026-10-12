@@ -22,11 +22,11 @@ declare(strict_types=1);
 
 namespace App\Components;
 
-use IamAdty\Empira\Attributes\Delete;
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Attributes\Prop;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
+use Empira\Attributes\Delete;
+use Empira\Attributes\Post;
+use Empira\Attributes\Prop;
+use Empira\Component;
+use Empira\Element;
 
 final class TodoList extends Component
 {
@@ -297,7 +297,7 @@ registers them during boot:
 
 ```php
 // src/Console/Seed.php
-final class Seed implements \IamAdty\Empira\Console\Command
+final class Seed implements \Empira\Console\Command
 {
     public function __construct(private readonly UserRepository $users) {}
 

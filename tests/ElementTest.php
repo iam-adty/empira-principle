@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
 use PHPUnit\Framework\TestCase;
 
@@ -10,14 +10,14 @@ final class ElementTest extends TestCase
 {
     public function testRendersATagWithTextChildren(): void
     {
-        $this->assertSame('<p>hello</p>', (new \IamAdty\Empira\Element('p', 'hello'))->render());
+        $this->assertSame('<p>hello</p>', (new \Empira\Element('p', 'hello'))->render());
     }
 
     public function testLeadingHashArgumentBecomesTheId(): void
     {
         $this->assertSame(
             '<div id="counter">hi</div>',
-            (new \IamAdty\Empira\Element('div', '#counter', 'hi'))->render()
+            (new \Empira\Element('div', '#counter', 'hi'))->render()
         );
     }
 
@@ -25,13 +25,13 @@ final class ElementTest extends TestCase
     {
         $this->assertSame(
             '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>',
-            (new \IamAdty\Empira\Element('p', '<script>alert(1)</script>'))->render()
+            (new \Empira\Element('p', '<script>alert(1)</script>'))->render()
         );
     }
 
     public function testAttributeValuesAreEscaped(): void
     {
-        $element = (new \IamAdty\Empira\Element('div'))->attr('title', 'a "quoted" & <dangerous> value');
+        $element = (new \Empira\Element('div'))->attr('title', 'a "quoted" & <dangerous> value');
 
         $this->assertSame(
             '<div title="a &quot;quoted&quot; &amp; &lt;dangerous&gt; value"></div>',
@@ -43,19 +43,19 @@ final class ElementTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        (new \IamAdty\Empira\Element('div'))->attr('onclick"><script>alert(1)</script>', 'x');
+        (new \Empira\Element('div'))->attr('onclick"><script>alert(1)</script>', 'x');
     }
 
     public function testIllegalTagNamesAreRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        new \IamAdty\Empira\Element('div><script>alert(1)</script>');
+        new \Empira\Element('div><script>alert(1)</script>');
     }
 
     public function testBooleanAttributes(): void
     {
-        $element = (new \IamAdty\Empira\Element('input'))
+        $element = (new \Empira\Element('input'))
             ->attr('type', 'checkbox')
             ->attr('checked', true)
             ->attr('disabled', false);
@@ -65,28 +65,28 @@ final class ElementTest extends TestCase
 
     public function testVoidElementsHaveNoClosingTag(): void
     {
-        $this->assertSame('<br>', (new \IamAdty\Empira\Element('br'))->render());
+        $this->assertSame('<br>', (new \Empira\Element('br'))->render());
     }
 
     public function testClassAppendsRatherThanReplaces(): void
     {
-        $element = (new \IamAdty\Empira\Element('div'))->class('a')->class('b', 'c');
+        $element = (new \Empira\Element('div'))->class('a')->class('b', 'c');
 
         $this->assertSame('<div class="a b c"></div>', $element->render());
     }
 
     public function testRawIsNotEscaped(): void
     {
-        $element = (new \IamAdty\Empira\Element('div'))->raw('<b>bold</b>');
+        $element = (new \Empira\Element('div'))->raw('<b>bold</b>');
 
         $this->assertSame('<div><b>bold</b></div>', $element->render());
     }
 
     public function testNestedElementsRenderInOrder(): void
     {
-        $list = (new \IamAdty\Empira\Element('ul'))->append(
-            new \IamAdty\Empira\Element('li', 'one'),
-            new \IamAdty\Empira\Element('li', 'two'),
+        $list = (new \Empira\Element('ul'))->append(
+            new \Empira\Element('li', 'one'),
+            new \Empira\Element('li', 'two'),
         );
 
         $this->assertSame('<ul><li>one</li><li>two</li></ul>', $list->render());
@@ -94,14 +94,14 @@ final class ElementTest extends TestCase
 
     public function testNullAndFalseChildrenAreDropped(): void
     {
-        $element = (new \IamAdty\Empira\Element('div'))->append('a', null, false, 'b');
+        $element = (new \Empira\Element('div'))->append('a', null, false, 'b');
 
         $this->assertSame('<div>ab</div>', $element->render());
     }
 
     public function testHtmxAttributeHelpers(): void
     {
-        $element = (new \IamAdty\Empira\Element('button', 'Load'))
+        $element = (new \Empira\Element('button', 'Load'))
             ->hxGet('/fragments')
             ->hxTarget('#list')
             ->hxSwap('innerHTML')
@@ -120,14 +120,14 @@ final class ElementTest extends TestCase
 
     public function testActionFallsBackToTheActionNameWithoutAResolver(): void
     {
-        $element = (new \IamAdty\Empira\Element('button'))->action('save');
+        $element = (new \Empira\Element('button'))->action('save');
 
         $this->assertSame('<button hx-post="save"></button>', $element->render());
     }
 
     public function testActionUsesTheResolverAndMergesDefaults(): void
     {
-        $element = (new \IamAdty\Empira\Element('button'))
+        $element = (new \Empira\Element('button'))
             ->withResolver(fn(string $action): string => '/empira/tok.' . $action)
             ->withActionDefaults(['swap' => 'outerHTML', 'target' => '#root'])
             ->action('save', ['target' => '#other']);
@@ -140,14 +140,14 @@ final class ElementTest extends TestCase
 
     public function testActionMethodIsCaseInsensitiveInOutput(): void
     {
-        $element = (new \IamAdty\Empira\Element('a'))->get('load');
+        $element = (new \Empira\Element('a'))->get('load');
 
         $this->assertSame('<a hx-get="load"></a>', $element->render());
     }
 
     public function testAWiredElementWithItsOwnIdTargetsItself(): void
     {
-        $element = (new \IamAdty\Empira\Element('form', '#search'))
+        $element = (new \Empira\Element('form', '#search'))
             ->withResolver(fn(): string => '/x')
             ->withActionDefaults(['swap' => 'outerHTML', 'target' => '#component-root'])
             ->action('search');
@@ -162,12 +162,12 @@ final class ElementTest extends TestCase
     {
         $target = '#late';
 
-        $element = (new \IamAdty\Empira\Element('div'))
+        $element = (new \Empira\Element('div'))
             ->withResolver(fn(): string => '/x')
             ->withActionDefaults(['swap' => 'outerHTML', 'target' => function () use (&$target): string {
                 return $target;
             }])
-            ->append((new \IamAdty\Empira\Element('button'))
+            ->append((new \Empira\Element('button'))
                 ->withResolver(fn(): string => '/x')
                 ->withActionDefaults(['swap' => 'outerHTML', 'target' => function () use (&$target): string {
                     return $target;
@@ -185,7 +185,7 @@ final class ElementTest extends TestCase
 
     public function testAnUnwiredElementGetsNoImplicitTarget(): void
     {
-        $element = (new \IamAdty\Empira\Element('div', '#wrapper'))
+        $element = (new \Empira\Element('div', '#wrapper'))
             ->withResolver(fn(): string => '/x')
             ->withActionDefaults(['swap' => 'outerHTML', 'target' => '#generated']);
 
@@ -194,7 +194,7 @@ final class ElementTest extends TestCase
 
     public function testAnExplicitTargetBeatsTheDefault(): void
     {
-        $element = (new \IamAdty\Empira\Element('div', '#search'))
+        $element = (new \Empira\Element('div', '#search'))
             ->withResolver(fn(): string => '/x')
             ->withActionDefaults(['swap' => 'outerHTML', 'target' => '#generated']);
 
@@ -205,7 +205,7 @@ final class ElementTest extends TestCase
 
     public function testAttributeValueCanBeRemovedWithNull(): void
     {
-        $element = (new \IamAdty\Empira\Element('div'))->hxBoost(true)->hxBoost(false);
+        $element = (new \Empira\Element('div'))->hxBoost(true)->hxBoost(false);
 
         $this->assertSame('<div></div>', $element->render());
     }

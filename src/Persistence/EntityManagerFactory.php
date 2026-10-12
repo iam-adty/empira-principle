@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Persistence;
+namespace Empira\Persistence;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\Configuration;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\Driver\AttributeDriver;
-use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Config\DatabaseConfig;
+use Empira\Config\Config;
+use Empira\Config\DatabaseConfig;
 
 /**
  * Builds the {@see EntityManagerInterface} the framework persists through.
@@ -23,7 +23,7 @@ use IamAdty\Empira\Config\DatabaseConfig;
  * identity map** — a stale user, a stale permission, a write that never lands.
  *
  * That is the same trap as the session, and it has the same answer: reset per
- * request, never per boot. {@see \IamAdty\Empira\Application} calls `clear()`
+ * request, never per boot. {@see \Empira\Application} calls `clear()`
  * where it calls `Session::beginRequest()`.
  */
 final class EntityManagerFactory

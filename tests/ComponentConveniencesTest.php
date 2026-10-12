@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Attributes\Prop;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\State\NullState;
+use Empira\Application;
+use Empira\Attributes\Post;
+use Empira\Attributes\Prop;
+use Empira\Component;
+use Empira\Element;
+use Empira\Http\Request;
+use Empira\State\NullState;
 use PHPUnit\Framework\TestCase;
 
 /**

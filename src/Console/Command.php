@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console;
+namespace Empira\Console;
 
 /**
  * One console command.

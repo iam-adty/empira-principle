@@ -3,9 +3,9 @@
 
 declare(strict_types=1);
 
-use IamAdty\Empira\Console\Application;
-use IamAdty\Empira\Console\Bootstrap;
-use IamAdty\Empira\Console\Output;
+use Empira\Console\Application;
+use Empira\Console\Bootstrap;
+use Empira\Console\Output;
 
 /**
  * The `empira` console.
@@ -42,7 +42,7 @@ use IamAdty\Empira\Console\Output;
 /**
  * Boot the project, if it has a bootstrap, and take its commands.
  *
- * This is what lets `empira seed` exist. {@see IamAdty\Empira\Console\Bootstrap}
+ * This is what lets `empira seed` exist. {@see Empira\Console\Bootstrap}
  * owns the discovery so that the test suite drives the same console the
  * operator does.
  */

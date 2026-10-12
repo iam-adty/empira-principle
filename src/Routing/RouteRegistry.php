@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
-use IamAdty\Empira\Attributes\Route;
+use Empira\Attributes\Route;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;

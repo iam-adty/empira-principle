@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
-if (!function_exists('IamAdty\Empira\\hx')) {
+if (!function_exists('Empira\\hx')) {
     /**
      * Create an element outside of a component.
      *

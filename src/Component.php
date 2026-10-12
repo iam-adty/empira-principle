@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
-use IamAdty\Empira\Attributes\Verb;
-use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Http\Session;
-use IamAdty\Empira\State\ActionMap;
-use IamAdty\Empira\State\PropBag;
-use IamAdty\Empira\Validation\ErrorBag;
-use IamAdty\Empira\Validation\Validator;
+use Empira\Attributes\Verb;
+use Empira\Container\Container;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Http\Session;
+use Empira\State\ActionMap;
+use Empira\State\PropBag;
+use Empira\Validation\ErrorBag;
+use Empira\Validation\Validator;
 
 /**
      * The base class for every piece of interactive UI.

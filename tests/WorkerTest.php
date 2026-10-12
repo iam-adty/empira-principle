@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
 use Closure;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\Http\Format;
-use IamAdty\Empira\Http\Middleware;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Http\Session;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\View\Layout;
-use IamAdty\Empira\View\Region;
+use Empira\Application;
+use Empira\Element;
+use Empira\Http\Format;
+use Empira\Http\Middleware;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Http\Session;
+use Empira\State\NullState;
+use Empira\View\Layout;
+use Empira\View\Region;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -251,15 +251,15 @@ final class WorkerTest extends TestCase
             $connection = $app->entities()->getConnection();
 
             (new \Doctrine\ORM\Tools\SchemaTool($app->entities()))->createSchema(
-                [$app->entities()->getClassMetadata(\IamAdty\Empira\Auth\User::class)]
+                [$app->entities()->getClassMetadata(\Empira\Auth\User::class)]
             );
 
-            $app->entities()->persist(new \IamAdty\Empira\Auth\User('ada@example.com', 'Ada', 'x'));
+            $app->entities()->persist(new \Empira\Auth\User('ada@example.com', 'Ada', 'x'));
             $app->entities()->flush();
 
             // Warm the worker, so it has genuinely held a user once.
             $app->handle(new Request('GET', '/'));
-            $app->entities()->getRepository(\IamAdty\Empira\Auth\User::class)->find(1);
+            $app->entities()->getRepository(\Empira\Auth\User::class)->find(1);
 
             // Changed on another connection — a second process, an admin tool.
             $connection->executeStatement(
@@ -271,7 +271,7 @@ final class WorkerTest extends TestCase
 
             self::assertSame(
                 'Ada Lovelace',
-                $app->entities()->getRepository(\IamAdty\Empira\Auth\User::class)->find(1)?->name(),
+                $app->entities()->getRepository(\Empira\Auth\User::class)->find(1)?->name(),
                 'the worker served this request from the last one\'s identity map'
             );
         } finally {

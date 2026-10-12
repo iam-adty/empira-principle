@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests\Fixtures;
+namespace Empira\Tests\Fixtures;
 
-use IamAdty\Empira\Attributes\Post;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\Raw;
+use Empira\Attributes\Post;
+use Empira\Component;
+use Empira\Element;
+use Empira\Raw;
 
 /**
  * A component with actions, used as a child.

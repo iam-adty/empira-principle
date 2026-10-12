@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console;
+namespace Empira\Console;
 
-use IamAdty\Empira\Console\Commands\MakeComponent;
-use IamAdty\Empira\Console\Commands\Migrate;
-use IamAdty\Empira\Console\Commands\MakeController;
-use IamAdty\Empira\Console\Commands\RouteList;
-use IamAdty\Empira\Console\Commands\Serve;
+use Empira\Console\Commands\MakeComponent;
+use Empira\Console\Commands\Migrate;
+use Empira\Console\Commands\MakeController;
+use Empira\Console\Commands\RouteList;
+use Empira\Console\Commands\Serve;
 
 /**
  * The console kernel: a registry of commands and the dispatcher that runs one.

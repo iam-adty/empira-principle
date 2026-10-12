@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Auth;
+namespace Empira\Auth;
 
-use IamAdty\Empira\Http\Request;
+use Empira\Http\Request;
 
 /**
  * Turns a request into a user, or into nothing.

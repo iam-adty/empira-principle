@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests;
+namespace Empira\Tests;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Http\Middleware;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Routing\Controller;
-use IamAdty\Empira\Routing\HttpException;
-use IamAdty\Empira\Routing\RouteCollection;
-use IamAdty\Empira\Routing\UrlGenerator;
-use IamAdty\Empira\State\NullState;
+use Empira\Application;
+use Empira\Container\Container;
+use Empira\Http\Middleware;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Routing\Controller;
+use Empira\Routing\HttpException;
+use Empira\Routing\RouteCollection;
+use Empira\Routing\UrlGenerator;
+use Empira\State\NullState;
 use PHPUnit\Framework\TestCase;
 
 /**

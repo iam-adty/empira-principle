@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Console;
+namespace Empira\Console;
 
-use IamAdty\Empira\Application;
+use Empira\Application;
 
 /**
  * Finds the commands a project has for itself.

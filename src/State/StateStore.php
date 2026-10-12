@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\State;
+namespace Empira\State;
 
 /**
  * Where a component keeps its props between requests.

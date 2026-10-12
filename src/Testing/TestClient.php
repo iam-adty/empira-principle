@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Testing;
+namespace Empira\Testing;
 
-use IamAdty\Empira\Application;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Security\Csrf;
+use Empira\Application;
+use Empira\Http\Request;
+use Empira\Security\Csrf;
 
 /**
  * Drives an {@see Application} the way a browser would, so a test can ask a
@@ -53,7 +53,7 @@ use IamAdty\Empira\Security\Csrf;
  * name always matches the one the guard was configured with rather than a
  * name assumed here.
  *
- * @see \IamAdty\Empira\Testing\TestResponse
+ * @see \Empira\Testing\TestResponse
  */
 final class TestClient
 {

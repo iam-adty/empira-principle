@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Container;
+namespace Empira\Container;
 
 /**
  * Marker returned by parameter resolution when a parameter cannot be filled.

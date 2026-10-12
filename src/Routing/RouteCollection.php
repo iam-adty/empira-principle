@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
 /**
  * The application's route table.
@@ -100,7 +100,7 @@ final class RouteCollection
     }
 
     /**
-     * Add a route that came from a {@see \IamAdty\Empira\Attributes\Route}.
+     * Add a route that came from a {@see \Empira\Attributes\Route}.
      *
      * Discovered routes carry a specificity order rather than a declaration
      * order, because a filesystem scan gives no meaningful sequence.
@@ -109,7 +109,7 @@ final class RouteCollection
      * @param class-string         $derivedName the name to use when the attribute omits one
      */
     public function addDiscovered(
-        \IamAdty\Empira\Attributes\Route $attribute,
+        \Empira\Attributes\Route $attribute,
         string $class,
         ?string $method,
         string $derivedName,

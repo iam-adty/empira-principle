@@ -2,31 +2,31 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira;
+namespace Empira;
 
-use IamAdty\Empira\Config\Config;
-use IamAdty\Empira\Auth\Auth;
-use IamAdty\Empira\Auth\Guard;
-use IamAdty\Empira\Container\Container;
-use IamAdty\Empira\Html;
-use IamAdty\Empira\Http\Format;
-use IamAdty\Empira\Http\Middleware;
-use IamAdty\Empira\Http\Pipeline;
-use IamAdty\Empira\Http\Request;
-use IamAdty\Empira\Http\Response;
-use IamAdty\Empira\Http\Session;
-use IamAdty\Empira\Routing\HttpException;
-use IamAdty\Empira\Routing\RouteCollection;
-use IamAdty\Empira\Routing\RouteParams;
-use IamAdty\Empira\Routing\RouteRegistrar;
-use IamAdty\Empira\Routing\RouteRegistry;
-use IamAdty\Empira\Routing\UrlGenerator;
-use IamAdty\Empira\Security\Csrf;
-use IamAdty\Empira\Persistence\EntityManagerFactory;
+use Empira\Config\Config;
+use Empira\Auth\Auth;
+use Empira\Auth\Guard;
+use Empira\Container\Container;
+use Empira\Html;
+use Empira\Http\Format;
+use Empira\Http\Middleware;
+use Empira\Http\Pipeline;
+use Empira\Http\Request;
+use Empira\Http\Response;
+use Empira\Http\Session;
+use Empira\Routing\HttpException;
+use Empira\Routing\RouteCollection;
+use Empira\Routing\RouteParams;
+use Empira\Routing\RouteRegistrar;
+use Empira\Routing\RouteRegistry;
+use Empira\Routing\UrlGenerator;
+use Empira\Security\Csrf;
+use Empira\Persistence\EntityManagerFactory;
 use Doctrine\ORM\EntityManagerInterface;
-use IamAdty\Empira\State\NullState;
-use IamAdty\Empira\State\StateStore;
-use IamAdty\Empira\Validation\ValidationException;
+use Empira\State\NullState;
+use Empira\State\StateStore;
+use Empira\Validation\ValidationException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -51,8 +51,8 @@ use Psr\Log\NullLogger;
  * `send()` intercepts action URLs before the fallback ever sees them, so
  * component traffic and ordinary page traffic coexist on one endpoint.
  *
- * @see \IamAdty\Empira\Component
- * @see \IamAdty\Empira\Registry
+ * @see \Empira\Component
+ * @see \Empira\Registry
  */
 final class Application
 {
@@ -92,10 +92,10 @@ final class Application
      */
     private bool $trustProxies = false;
 
-    /** @var list<\IamAdty\Empira\Auth\Guard> */
+    /** @var list<\Empira\Auth\Guard> */
     private array $guards = [];
 
-    /** @var array<string, \IamAdty\Empira\Console\Command> commands the application supplied */
+    /** @var array<string, \Empira\Console\Command> commands the application supplied */
     private array $commands = [];
 
     /** Where anything the framework has to record goes. Discards, unless told otherwise. */
@@ -183,7 +183,7 @@ final class Application
      *
      * @throws \InvalidArgumentException when the name is already registered
      */
-    public function command(string $name, \IamAdty\Empira\Console\Command $command): self
+    public function command(string $name, \Empira\Console\Command $command): self
     {
         if (isset($this->commands[$name])) {
             throw new \InvalidArgumentException(sprintf(
@@ -201,7 +201,7 @@ final class Application
      * The commands this application registered, keyed by the name each is
      * invoked with.
      *
-     * @return array<string, \IamAdty\Empira\Console\Command>
+     * @return array<string, \Empira\Console\Command>
      */
     public function commands(): array
     {

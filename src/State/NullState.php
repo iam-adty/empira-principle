@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\State;
+namespace Empira\State;
 
 /**
  * The stateless default: props always travel inside the signed token, so

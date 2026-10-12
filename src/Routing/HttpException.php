@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Routing;
+namespace Empira\Routing;
 
-use IamAdty\Empira\Exception;
+use Empira\Exception;
 
 /**
  * An HTTP status the application wants to return.

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace IamAdty\Empira\Tests\Fixtures;
+namespace Empira\Tests\Fixtures;
 
-use IamAdty\Empira\Attributes\Get;
-use IamAdty\Empira\Component;
-use IamAdty\Empira\Element;
-use IamAdty\Empira\Raw;
-use IamAdty\Empira\StyleOrder;
+use Empira\Attributes\Get;
+use Empira\Component;
+use Empira\Element;
+use Empira\Raw;
+use Empira\StyleOrder;
 
 /**
  * A styled child, and the baseline every aggregation test measures against.
