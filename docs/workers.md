@@ -12,12 +12,21 @@ A worker is something an application installs, like any other module:
 
 ```php
 // bootstrap/modules.php
-return [new FrankenPhpModule()];
+return function (Application $app): array {
+    return [new FrankenPhpModule()];
+};
 ```
 
+and then runs under a FrankenPHP PHP, from the application root:
+
 ```bash
-docker compose -f frankenphp/docker/compose.yml up -d --build
+vendor/bin/frankenphp-worker --app=/path/to/app
 ```
+
+There is no image to pull. A stock PHP cannot become FrankenPHP at runtime — the
+extension has to exist before PHP starts — so producing one is an application and
+deployment decision, and [`empira-frankenphp`](../frankenphp) deliberately does not
+make it for you.
 
 ## Why this page exists
 
@@ -196,7 +205,7 @@ is unambiguous — which is the point, because at the 2 × CPU default a leak on
 shows itself about one request in 32:
 
 ```bash
-FRANKENPHP_WORKERS=1 docker compose -f frankenphp/docker/compose.yml up -d
+FRANKENPHP_WORKERS=1 vendor/bin/frankenphp-worker --app=/path/to/app
 ```
 
 Sign in, then interleave requests from that cookie jar and an empty one. The
