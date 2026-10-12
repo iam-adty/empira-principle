@@ -5,13 +5,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**This project is pre-1.0.** Treat `0.x` releases as a moving target: the API
-can change without a major bump, though changes are always documented here.
+**This project is pre-1.0 and has never been released.** The API can change at any
+commit, though changes are always documented here. The development line is
+`0.1.x-dev`, a Composer branch alias rather than a release.
+
+When a first release does happen it will be `0.1.0-alpha.N`, **not** `0.1.0`.
+Composer parses `0.1.0` and `0.0.1` as `stable`, so a plain `0.x` tag would read
+as a release — which is the opposite of what an unreleased project needs to
+signal. `alpha` is honestly non-stable and promises nothing about a 1.0 API.
 
 ## [Unreleased]
 
-> **Nothing has been released.** No git tag exists, no remote is configured, and
-> the package is not on Packagist. Everything below describes the working tree.
+> **Nothing has been released.** No git tag exists in any repository, and the
+> package is not on Packagist. All five repositories are public on GitHub and
+> everything below describes `main`.
 
 ### Added
 
@@ -142,8 +149,7 @@ can change without a major bump, though changes are always documented here.
 - **The suite runs in Docker against a real PostgreSQL.** `tools/test` starts
   the database if it is down and refuses to run if it cannot — a suite that
   quietly skipped the driver tests would be a green tick that proves nothing.
-  This removed the CI workflow, which never ran because neither repository has
-  a remote.
+  This removed the CI workflow, which never ran.
 - `Layout::styles()` now wraps a `Raw` stylesheet in a `<style>` element instead
   of appending it bare into `<head>`, where a browser would hoist it away and
   discard it. An `Element` return value is still used as-is.
@@ -327,7 +333,11 @@ working tree. It has not been tagged or published.
 
 ### Known limitations
 
-True and unfixed at this point:
+True and unfixed **at the end of initial development** — a snapshot, not the
+current state. Several of these were fixed long ago: routing is specificity-sorted,
+authentication shipped as a separate module, and all five repositories are public.
+The repositories exist now; this list is what was true before they did. Current
+gaps are in [dev/planning/CHECKLIST.md](https://github.com/iam-adty/empira-dev/blob/main/planning/CHECKLIST.md).
 
 - Routing is first-match-wins with no specificity sort, so `/todos/new` must be
   declared before `/todos/{id}`. Scheduled in [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md).

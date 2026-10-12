@@ -15,9 +15,28 @@ PDO wrapper and additionally needs PDO plus a driver for your database.
 
 ## Installation
 
-```bash
-composer require iam-adty/empira-principle
+Not on Packagist yet, so Composer has to be told where to look. Add this to your
+`composer.json`:
+
+```json
+{
+    "repositories": [
+        { "type": "vcs", "url": "https://github.com/iam-adty/empira-principle.git" }
+    ]
+}
 ```
+
+Then:
+
+```bash
+composer require iam-adty/empira-principle:dev-main
+```
+
+`:dev-main` is needed because there is no release to satisfy. The package aliases
+its branch as `0.1.x-dev`, so `^0.1@dev` is an equally valid way to write this —
+the alias exists so you can constrain a *version* before there is a release,
+without it ever reading as one. When this reaches Packagist, both the repository
+block and the suffix go away.
 
 ## A component
 

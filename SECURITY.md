@@ -146,5 +146,6 @@ including: what you found, a minimal reproduction, and the impact you believe it
 has.
 
 You can expect an acknowledgement within a few days, and an assessment once
-reproduced. There is no published disclosure policy yet — this framework is
-pre-1.0 and that document does not exist yet either.
+reproduced. There is no published disclosure policy yet, so treat anything shared
+here as private and do not expect coordinated timing — if a fix is warranted,
+assume it ships as soon as it is ready.
