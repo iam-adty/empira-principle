@@ -10,8 +10,12 @@ server did not publish.
 
 ## Requirements
 
-PHP 8.4 or newer. No extensions are required. `Empira\Data\Connection` is a thin
-PDO wrapper and additionally needs PDO plus a driver for your database.
+PHP 8.4 or newer, plus `pdo_sqlite` — which ships enabled in most builds, and is
+the only database this framework speaks. Doctrine does the persistence; there is
+no PDO wrapper of ours left to configure.
+
+`composer test` refuses to run without `pdo_sqlite` rather than reporting a pass
+with the persistence tests never having run.
 
 ## Installation
 
