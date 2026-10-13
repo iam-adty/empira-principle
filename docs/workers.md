@@ -5,7 +5,6 @@ is needed to run an application.
 
 ```bash
 composer serve                              # classic, one request, one process
-docker compose -f app up -d                 # classic, nginx + php-fpm, no image
 ```
 
 A worker is something an application installs, like any other module:
@@ -76,7 +75,7 @@ only make the window narrower.
 | State | Lives in | Shared between workers? |
 |---|---|---|
 | `$_SESSION` | `/tmp/sess_*` files | **yes** — one container filesystem |
-| Database rows | PostgreSQL | **yes** |
+| Database rows | SQLite | **yes** |
 | Component state (`SessionState`) | `$_SESSION`, so files | **yes** |
 | Secret, registry, route table | re-derived from the environment at boot | **yes** — identical in every worker |
 | `PropBag` / `ActionMap` caches | reflection of class definitions | **yes** — same input, same output |
@@ -117,7 +116,7 @@ run once, from `bootstrap/app.php`'s console entry, and boot only wires. **Do no
 add a write to boot** — if boot needs data, seed it before the workers start,
 which is what the `php` compose service does.
 
-There was once an `App::bootLock()` here, taking a `pg_advisory_lock` around
+There was once an `App::bootLock()` here, taking an advisory lock around
 migrations and seeding to serialise boot into happening once. It does not exist in
 any package. The locking was treating the symptom: a lock makes thirty-two threads
 take turns doing something that should have been done once, before any of them
@@ -125,9 +124,14 @@ existed, and it leaves the real constraint — that a worker's boot is racy by
 design — in place for the next person to add a fourth write to.
 
 **Connections scale per worker, not per application.** Each worker holds its own
-PDO handle, so 32 workers is 32 connections out of PostgreSQL's default 100.
-Fine here; worth remembering before running the app and a second service against
-one database.
+PDO handle, so 32 workers is 32 open handles on one file. SQLite has no server
+connection limit to run into, which is one thing the move bought — though the
+write contention it replaces is real, and SQLite serialises writers with a file
+lock, so the constraint moves rather than disappears.
+
+The paragraph used to be about PostgreSQL's default 100 connections, and the
+advice it carried — remember your pool limit before running two services against
+one database — applied only to that server. There is no server here to exhaust.
 
 **Failures become intermittent.** This is the cost that actually hurts. A
 per-worker state leak only surfaces when two consecutive requests for one

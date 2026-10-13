@@ -1,7 +1,7 @@
 # Data
 
-> **Status: describes shipped code.** Verified against `485 tests, 1087
-> assertions`; the PostgreSQL tests run against a real server in Docker.
+> **Status: describes shipped code.** Verified against `483 tests, 1082
+> assertions`, on SQLite.
 
 Persistence is Doctrine's. The framework wires it and gets out of the way:
 
@@ -129,10 +129,11 @@ There are none of the framework's own. Doctrine's platform classes quote, limit
 and offset, and knowing which is which is not a decision this framework gets to
 make again.
 
-The portable spelling of a column type is still not portable: SQLite has no
-`JSONB` and PostgreSQL has no `CLOB`, and a migration that has to run on both
-asks the platform which one it is standing on. Asking through the Schema is
-better than writing a type and being told `type "clob" does not exist`.
+A portable spelling of a column type is not automatically portable: SQLite has
+no `JSONB`, and a migration naming one is told `type "jsonb" does not exist`.
+Asking the Schema is better than writing a type and being corrected by the
+server — which is why a migration asks the platform rather than the migration
+author choosing.
 
 ## Transactions
 
@@ -148,18 +149,21 @@ an outer one is a savepoint, not a second commit.
 
 ## Running the tests
 
-The suite runs in Docker against a real PostgreSQL:
+The suite runs on the host PHP against SQLite, and needs no server and no
+container:
 
 ```bash
-composer test                 # starts the services if they are down
+composer test
 ```
 
-`tools/test` refuses to run if the database cannot start, rather than reporting
-a pass with the driver tests silently skipped. To iterate on SQLite alone:
+`tools/test` refuses to run if the host PHP has no `pdo_sqlite`, rather than
+reporting a pass with the persistence tests never having run.
 
-```bash
-vendor/bin/phpunit --exclude-group driver
-```
+**SQLite is the only database this framework speaks.** `DB_DRIVER=pgsql` is
+refused by name rather than quietly opening something else — and "something else"
+here is a file that does not exist yet and would be created empty, which is the
+failure that looks like working software. Doctrine is still underneath all of it:
+DBAL opens the file, ORM maps and queries it, Migrations plans against it.
 
 ## Further reading
 

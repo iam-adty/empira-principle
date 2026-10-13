@@ -5,9 +5,9 @@
 
 Thanks for looking. This is a young framework, and the test suite is still the
 gate — there is no CI, so `composer test` before claiming something works. It
-runs the whole suite in Docker against a real PostgreSQL, so **Docker is
-required** — `composer test` starts the services and refuses to run if they
-cannot come up.
+runs on the host PHP against SQLite, so there is nothing to start and nothing to
+install but `pdo_sqlite`; `composer test` refuses to run without it rather than
+reporting a pass with the persistence tests never having run.
 
 ## Setup
 
