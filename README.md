@@ -300,7 +300,7 @@ vendor/bin/empira list
 vendor/bin/empira make:component Counter
 ```
 
-A worked application lives in [`../app`](../app) — start there if you would
+A worked application lives in [`empira-app`](https://github.com/iam-adty/empira-app) — start there if you would
 rather read a real app than a reference component.
 
 ## License

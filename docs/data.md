@@ -164,5 +164,5 @@ vendor/bin/phpunit --exclude-group driver
 ## Further reading
 
 - [docs/routing.md](routing.md) — handlers and middleware
-- [../../auth/README.md](../../auth/README.md) — who is asking, and what an entity means here
+- [auth/README.md](https://github.com/iam-adty/empira-auth/blob/main/README.md) — who is asking, and what an entity means here
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — where persistence sits in a request

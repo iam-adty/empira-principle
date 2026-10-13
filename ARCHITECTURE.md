@@ -191,7 +191,7 @@ cross-site page cannot forge it. The framework asks whether the answering guard
 is marked `NonAmbientCredential` — a property, not a class — so a module can add
 its own mechanism without CSRF growing an `instanceof` per mechanism.
 
-See [../auth/README.md](../auth/README.md).
+See [auth/README.md](https://github.com/iam-adty/empira-auth/blob/main/README.md).
 
 ## Testing strategy
 

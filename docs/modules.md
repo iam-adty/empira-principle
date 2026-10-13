@@ -11,7 +11,7 @@ $app->module(new AuthModule([new SessionGuard($app->session(), $users)]));
 ```
 
 Authentication is the one module that ships, in
-[`../auth`](../auth). It is the worked example for everything here.
+[`iam-adty/empira-auth`](https://github.com/iam-adty/empira-auth). It is the worked example for everything here.
 
 ## Why this exists
 

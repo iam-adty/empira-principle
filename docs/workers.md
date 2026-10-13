@@ -25,7 +25,7 @@ vendor/bin/frankenphp-worker --app=/path/to/app
 
 There is no image to pull. A stock PHP cannot become FrankenPHP at runtime — the
 extension has to exist before PHP starts — so producing one is an application and
-deployment decision, and [`empira-frankenphp`](../frankenphp) deliberately does not
+deployment decision, and [`empira-frankenphp`](https://github.com/iam-adty/empira-frankenphp) deliberately does not
 make it for you.
 
 ## Why this page exists
@@ -50,7 +50,7 @@ application run under both without knowing which it is — and it means the rule
 on this page are not a worker-only appendix, they are simply how the framework is
 written.
 
-Worker mode ships as [`iam-adty/empira-frankenphp`](../frankenphp), which holds
+Worker mode ships as [`iam-adty/empira-frankenphp`](https://github.com/iam-adty/empira-frankenphp), which holds
 the loop and a base image, because FrankenPHP cannot be added to a stock PHP at
 runtime — the extension has to exist before PHP starts. The framework itself
 contains no FrankenPHP code and does not require that package; an application that
