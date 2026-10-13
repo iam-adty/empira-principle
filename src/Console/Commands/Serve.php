@@ -58,10 +58,33 @@ final class Serve implements Command
 
         $command = sprintf('php -S %s:%s -t public public/index.php', $host, $port);
 
-        $output->info(sprintf('Serving %s on http://%s:%s', $target, $host, $port));
+        $this->announce($target, $host, $port, $output);
         $output->line($command);
 
         return $this->start($target, $command);
+    }
+
+    /**
+     * Say where the server is, in terms someone can act on.
+     *
+     * `0.0.0.0` is a bind address, not a destination. Announcing
+     * "Serving on http://0.0.0.0:8000" is technically true and practically
+     * useless: pasting it into a browser works on some systems and not others,
+     * and on the ones where it works you have learned nothing about the address
+     * you would actually hand to somebody else. So a wildcard bind says what it
+     * did — every interface — and gives the two addresses that do work.
+     */
+    private function announce(string $target, string $host, string $port, Output $output): void
+    {
+        if ($host !== '0.0.0.0' && $host !== '::') {
+            $output->info(sprintf('Serving %s on http://%s:%s', $target, $host, $port));
+
+            return;
+        }
+
+        $output->info(sprintf('Serving %s on every interface, port %s', $target, $port));
+        $output->line(sprintf('  local     http://localhost:%s', $port));
+        $output->line(sprintf('  network   http://<this machine\'s address>:%s — the bind is not a firewall', $port));
     }
 
     /**
