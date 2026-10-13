@@ -10,8 +10,12 @@ something you install — a package implementing `Module`, wired in one call.
 $app->module(new AuthModule([new SessionGuard($app->session(), $users)]));
 ```
 
-Authentication is the one module that ships, in
-[`iam-adty/empira-auth`](https://github.com/iam-adty/empira-auth). It is the worked example for everything here.
+Modules ship as their own packages:
+[`iam-adty/empira-auth`](https://github.com/iam-adty/empira-auth) for
+authentication, [`iam-adty/empira-frankenphp`](https://github.com/iam-adty/empira-frankenphp)
+for worker mode, and
+[`iam-adty/empira-debug-tools`](https://github.com/iam-adty/empira-debug-tools)
+for request profiling. Authentication is the worked example for everything here.
 
 ## Why this exists
 
