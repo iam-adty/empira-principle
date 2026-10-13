@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Empira;
 
 use Empira\Config\Config;
+use Empira\Console\CommandProvider;
 use Empira\Security\Guard;
 use Empira\Security\RequestUser;
 use Empira\Container\Container;
@@ -214,6 +215,16 @@ final class Application
                     $this->migrationSources[$namespace] = $directory;
                 }
             }
+
+            // Same reasoning as migrations, same moment: a module that ships
+            // commands says so here rather than reaching into the application
+            // from inside register(), which would make the commands a property of
+            // the wiring instead of of the module.
+            if ($module instanceof CommandProvider) {
+                foreach ($module->commands() as $name => $command) {
+                    $this->command($name, $command);
+                }
+            }
         }
 
         return $this;
@@ -267,6 +278,56 @@ final class Application
         }
 
         $this->commands[$name] = $command;
+
+        return $this;
+    }
+
+    /**
+     * Register every command under `$directory`, found by existing.
+     *
+     * The counterpart to {@see discover()}, and the same bargain: a class that
+     * declares a name is a command, so a new one is wired by being written
+     * rather than by adding a line to a bootstrap. Laravel's `app/Console` is the
+     * convention and this is the same one.
+     *
+     *     $app->discoverCommands(dirname(__DIR__) . '/src/Console', 'App\\Console');
+     *
+     * Two things are decided here rather than by the caller.
+     *
+     * **The name comes from the command, not the file.** `Command::name()` is the
+     * contract the console dispatches on, so a class called `Purge` may be
+     * invoked as `purge`. Deriving it from the basename would mean the file name
+     * silently mattered.
+     *
+     * **Commands are built by the container.** A command that touches the
+     * database needs `Application`, and requiring every command to be
+     * dependency-free would push `new` into the caller — which is the
+     * registration this method exists to remove. A command whose dependencies
+     * cannot be resolved fails here, at boot, rather than when an operator types
+     * its name.
+     *
+     * A directory that does not exist contributes nothing. An application with no
+     * commands has no `src/Console/`, and that is not a mistake to report.
+     * A class in the directory that is not a command is skipped, so
+     * `app/Console/` can hold helpers.
+     *
+     * @param string $namespace the namespace `$directory` holds, e.g. `App\Console`
+     *
+     * @throws \InvalidArgumentException when two commands answer to one name
+     * @throws \Empira\Container\ContainerException when a command cannot be built
+     */
+    public function discoverCommands(string $directory, string $namespace): self
+    {
+        foreach (ClassScanner::in($directory, $namespace) as $class) {
+            if (!is_a($class, Console\Command::class, true)) {
+                continue;
+            }
+
+            /** @var Console\Command $command */
+            $command = $this->container->make($class);
+
+            $this->command($command->name(), $command);
+        }
 
         return $this;
     }

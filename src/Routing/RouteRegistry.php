@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Empira\Routing;
 
 use Empira\Attributes\Route;
+use Empira\ClassScanner;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
@@ -45,7 +46,7 @@ final class RouteRegistry
      */
     public static function discover(RouteCollection $routes, string $directory, string $namespace): void
     {
-        foreach (self::classesIn($directory, $namespace) as $class) {
+        foreach (ClassScanner::in($directory, $namespace) as $class) {
             self::registerClass($routes, $class);
         }
     }
@@ -88,45 +89,7 @@ final class RouteRegistry
     }
 
 
-    /**
-     * @return list<string>
-     */
-    private static function classesIn(string $directory, string $namespace): array
-    {
-        if (!is_dir($directory)) {
-            return [];
-        }
-
-        $classes = [];
-        $prefix = trim($namespace, '\\') . '\\';
-
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS)
-        );
-
-        /** @var \SplFileInfo $file */
-        foreach ($files as $file) {
-            if (!$file->isFile() || $file->getExtension() !== 'php') {
-                continue;
-            }
-
-            $relative = substr($file->getPathname(), strlen(rtrim($directory, '/')) + 1);
-            $class = $prefix . str_replace(['/', '.php'], ['\\', ''], $relative);
-
-            if (!class_exists($class)) {
-                // PSR-4 mismatch: the autoloader cannot find what the path implies.
-                error_log(sprintf('empira: no autoloadable class %s at %s', $class, $file->getPathname()));
-
-                continue;
-            }
-
-            $classes[] = $class;
-        }
-
-        sort($classes);
-
-        return $classes;
-    }
+    
 
     /**
      * @param ReflectionClass<object>|ReflectionMethod $reflector

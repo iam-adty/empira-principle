@@ -45,23 +45,31 @@ use Empira\Console\Output;
  * This is what lets `empira seed` exist. {@see Empira\Console\Bootstrap}
  * owns the discovery so that the test suite drives the same console the
  * operator does.
+ *
+ * Registering the project's commands is inside the try as well as booting it,
+ * because that is where a name collision is found: an application registering
+ * `migrate` has done nothing wrong as far as `Application` knows — it cannot
+ * know which names the framework ships — so the console is what refuses it. Left
+ * outside, that refusal arrives as an uncaught `InvalidArgumentException` with a
+ * stack trace through three vendor directories, for what is a sentence an
+ * operator can act on.
  */
 $console = new Application();
 
 try {
     $booted = Bootstrap::boot(getcwd() ?: '.');
+
+    if ($booted !== null) {
+        foreach ($booted->commands() as $name => $command) {
+            $console->project($name, $command);
+        }
+
+        $console->booted($booted);
+    }
 } catch (\Throwable $e) {
     fwrite(STDERR, 'empira: ' . $e->getMessage() . PHP_EOL);
 
     exit(1);
-}
-
-if ($booted !== null) {
-    foreach ($booted->commands() as $name => $command) {
-        $console->project($name, $command);
-    }
-
-    $console->booted($booted);
 }
 
 exit($console->run($argv, new Output()));
