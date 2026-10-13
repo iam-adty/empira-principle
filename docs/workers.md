@@ -106,11 +106,23 @@ Everything below happens in `Application::handle()`, before dispatch:
 FrankenPHP's default is **2 × CPU** — 32 workers on a 16-core machine. That is the
 right default for throughput. It is not free, and it is worth knowing the bill:
 
-**Boot is concurrent.** Every worker thread runs `App::boot()`. Thirty-two
-threads asking "does the user exist?" all get "no" before any of them inserts, and
-31 die on the unique index. `App::bootLock()` takes a `pg_advisory_lock` around
-migrations and seeding to put boot back to happening once — **anything added to
-boot that writes must go under it.**
+**Boot is concurrent, and boot must not write.** Every worker thread runs
+`App::boot()` at once, so anything boot does that writes is done thirty-two times
+simultaneously — thirty-two threads asking "does the user exist?" all get "no"
+before any of them inserts, and thirty-one die on a unique index.
+
+This is not a race to be locked around. It is the reason migrating and seeding
+are deploy steps rather than boot behaviour: `empira migrate` and `empira seed`
+run once, from `bootstrap/app.php`'s console entry, and boot only wires. **Do not
+add a write to boot** — if boot needs data, seed it before the workers start,
+which is what the `php` compose service does.
+
+There was once an `App::bootLock()` here, taking a `pg_advisory_lock` around
+migrations and seeding to serialise boot into happening once. It does not exist in
+any package. The locking was treating the symptom: a lock makes thirty-two threads
+take turns doing something that should have been done once, before any of them
+existed, and it leaves the real constraint — that a worker's boot is racy by
+design — in place for the next person to add a fourth write to.
 
 **Connections scale per worker, not per application.** Each worker holds its own
 PDO handle, so 32 workers is 32 connections out of PostgreSQL's default 100.

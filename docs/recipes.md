@@ -327,8 +327,15 @@ For the console to find that, it needs a bootstrap it can run:
 // bootstrap/app.php
 require __DIR__ . '/../vendor/autoload.php';
 
-return App::boot();
+return App::bootConsole();
 ```
+
+`bootConsole()`, not `boot()`. They build the same application — same modules,
+ORM and routes, which is what lets `empira migrate` plan across every module's
+migrations — and the only difference is CSRF, which is a property of a browser
+session and means nothing on a command line. Calling `boot()` here would give the
+console a web application, which works until the day a command reads
+`$_SESSION` and finds it empty.
 
 `bin/empira` looks for `bootstrap/app.php` in the working directory, or wherever
 `EMPIRA_BOOTSTRAP` points. It is **optional** — `make:component` and `route:list`
@@ -337,6 +344,22 @@ work in a checkout with no application at all.
 Project commands are marked `(project)` in `list`, and cannot take the name of a
 framework command. Two `migrate`s where the winner depends on registration order
 is not a surprise a console should have.
+
+**Or skip the registration entirely.** A class under `src/Console/` that implements
+`Console\Command` is a command by being there:
+
+```php
+// bootstrap/app.php
+$app = App::bootConsole();
+$app->discoverCommands(dirname(__DIR__) . '/src/Console', 'App\\Console');
+
+return $app;
+```
+
+The name comes from `Command::name()` rather than the filename, and the command is
+built by the container so it can declare what it needs. See
+[modules.md](modules.md#the-applications-own-commands) for the module side, where
+a package declares its own commands instead.
 
 ---
 
