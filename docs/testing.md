@@ -10,8 +10,14 @@ vendor/bin/phpunit tests/RoutingTest.php       # one file
 vendor/bin/phpunit --filter=testACycle         # one behaviour
 ```
 
-No database, no network, no fixtures to load. The suite is fast because it never
-starts a server.
+No database **server**, no network, no fixtures to load. The suite is fast because
+it never starts one — and it used to, against PostgreSQL, for five tests out of
+four hundred and eighty.
+
+Persistence is still exercised for real: those tests open an actual SQLite file
+and run Doctrine over it, because asserting that an ORM works is the whole point
+of having one. The files go in the workspace `tmp/` and are removed afterwards;
+`ls -A tmp` coming back empty is how you know a run finished.
 
 ## TestClient
 
