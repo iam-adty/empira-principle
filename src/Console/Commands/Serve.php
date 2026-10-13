@@ -58,14 +58,24 @@ final class Serve implements Command
 
         $command = sprintf('php -S %s:%s -t public public/index.php', $host, $port);
 
-        $this->announce($target, $host, $port, $output);
+        // The headline keeps `info()` and so keeps its colour; the addresses below
+        // it are plain output. That distinction is the only reason this is not a
+        // loop over `line()`, and `announcement()` returns strings so it can be
+        // tested without a server.
+        $lines = self::announcement($target, $host, $port);
+        $output->info((string) array_shift($lines));
+
+        foreach ($lines as $line) {
+            $output->line($line);
+        }
+
         $output->line($command);
 
         return $this->start($target, $command);
     }
 
     /**
-     * Say where the server is, in terms someone can act on.
+     * Where the server is, in terms someone can act on.
      *
      * `0.0.0.0` is a bind address, not a destination. Announcing
      * "Serving on http://0.0.0.0:8000" is technically true and practically
@@ -73,18 +83,27 @@ final class Serve implements Command
      * and on the ones where it works you have learned nothing about the address
      * you would actually hand to somebody else. So a wildcard bind says what it
      * did — every interface — and gives the two addresses that do work.
+     *
+     * **Static and pure, rather than printing as it goes.** The only other way to
+     * reach this text is through `handle()`, which hands the terminal to `php -S`
+     * and does not come back — so testing it that way means testing it by
+     * starting a server, or not testing it. A message that is the only thing
+     * standing between someone and pasting an unusable URL should not be the one
+     * line here with no test.
+     *
+     * @return list<string>
      */
-    private function announce(string $target, string $host, string $port, Output $output): void
+    public static function announcement(string $target, string $host, string $port): array
     {
         if ($host !== '0.0.0.0' && $host !== '::') {
-            $output->info(sprintf('Serving %s on http://%s:%s', $target, $host, $port));
-
-            return;
+            return [sprintf('Serving %s on http://%s:%s', $target, $host, $port)];
         }
 
-        $output->info(sprintf('Serving %s on every interface, port %s', $target, $port));
-        $output->line(sprintf('  local     http://localhost:%s', $port));
-        $output->line(sprintf('  network   http://<this machine\'s address>:%s — the bind is not a firewall', $port));
+        return [
+            sprintf('Serving %s on every interface, port %s', $target, $port),
+            sprintf('  local     http://localhost:%s', $port),
+            sprintf('  network   http://<this machine\'s address>:%s — the bind is not a firewall', $port),
+        ];
     }
 
     /**

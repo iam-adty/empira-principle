@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Empira\Tests;
 
 use Empira\Console\Application;
+use Empira\Console\Commands\Serve;
 use Empira\Console\Output;
 use PHPUnit\Framework\TestCase;
 
@@ -334,6 +335,56 @@ final class ConsoleTest extends TestCase
 
         $this->assertSame(1, $result['code']);
         $this->assertStringContainsString('is not a valid port number', $result['output']);
+    }
+
+    // ------------------------------------------------------- what serve says
+
+    /**
+     * The default is a URL, because 127.0.0.1 is both a bind and somewhere you
+     * can go.
+     */
+    public function testServeAnnouncesAnOrdinaryBindAsAUrl(): void
+    {
+        $lines = Serve::announcement('/srv/app', '127.0.0.1', '8000');
+
+        self::assertSame(['Serving /srv/app on http://127.0.0.1:8000'], $lines);
+    }
+
+    /**
+     * `0.0.0.0` is an address to bind to and not one to visit, so announcing it
+     * as a URL tells the reader nothing they could paste into a browser.
+     */
+    public function testServeDoesNotAnnounceAWildcardBindAsAUrl(): void
+    {
+        $lines = implode("\n", Serve::announcement('/srv/app', '0.0.0.0', '8000'));
+
+        self::assertStringNotContainsString('http://0.0.0.0', $lines);
+        self::assertStringContainsString('every interface', $lines);
+    }
+
+    /**
+     * …and it gives the two addresses that do work, because "bound to
+     * everything" without them leaves the reader to work out how to reach it.
+     */
+    public function testServeNamesTheAddressesAWildcardBindActuallyAnswers(): void
+    {
+        $lines = Serve::announcement('/srv/app', '0.0.0.0', '8000');
+
+        self::assertStringContainsString('http://localhost:8000', implode("\n", $lines));
+        self::assertStringContainsString('8000', implode("\n", $lines));
+        self::assertStringContainsString('not a firewall', implode("\n", $lines));
+    }
+
+    /**
+     * `::` is the IPv6 wildcard and means exactly the same thing, so it gets the
+     * same answer rather than being announced as a URL.
+     */
+    public function testServeTreatsTheIpv6WildcardAsAWildcardToo(): void
+    {
+        self::assertStringContainsString(
+            'every interface',
+            implode("\n", Serve::announcement('/srv/app', '::', '8000')),
+        );
     }
 
     public function testOutputWritesNoAnsiCodesWhenTheStreamIsNotATerminal(): void
