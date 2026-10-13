@@ -1,6 +1,6 @@
 # Modules
 
-> **Status: describes shipped code.** Verified against `473 tests, 1071
+> **Status: describes shipped code.** Verified against `485 tests, 1087
 > assertions`.
 
 The framework assumes an application needs very little. Everything else is
@@ -31,6 +31,7 @@ contracts, and a package implements them.
 |---|---|
 | `Module` | one method — `register(Application $app): void` |
 | `MigrationSource` | which migration directories this module ships |
+| `Console\CommandProvider` | which console commands this module ships |
 
 And, for authentication specifically, the contracts that make it possible to ask
 who is asking without owning an answer:
@@ -118,6 +119,73 @@ The command learns about modules because `Bootstrap::boot()` returns the booted
 application rather than only its commands, and `bin/empira` hands it to the
 console, which hands it to `migrate`. **Anything else driving the console has to
 do the same**, or it will migrate a schema missing every table the modules own.
+
+### Shipping commands
+
+Implement `CommandProvider` alongside `Module`:
+
+```php
+public function commands(): array
+{
+    return ['greet:everyone' => new GreetEveryone($app->entities())];
+}
+```
+
+The commands are collected by `Application::module()` immediately after
+`register()`, beside migrations. A module that returns no commands registers none,
+which is why the interface is opt-in rather than part of `Module`: most modules
+have nothing to put there.
+
+Declaring them here rather than calling `$app->command()` inside `register()`
+keeps the module's commands a property of the module. Registering by hand works
+and a scratch application does it, but it mixes what the module *is* with how it
+was wired in — and there is then no way for the installing application to say
+*install this module without its `db:vacuum`*.
+
+A command cannot take a name `empira` already owns. `Application` cannot know
+which names those are without holding a copy that would drift, so it accepts the
+registration and the console refuses it by name when it is built:
+
+```
+$ vendor/bin/empira list
+empira: A command called "migrate" is already registered.
+```
+
+## The application's own commands
+
+Modules are half of it. Commands belonging to the application rather than to a
+package are **found rather than listed** — `Application::discoverCommands()` scans
+a directory, and any class implementing `Console\Command` is one:
+
+```php
+// bootstrap/app.php — the console entry, not public/index.php
+$app = App::bootConsole();
+
+$app->discoverCommands(dirname(__DIR__) . '/src/Console', 'App\\Console');
+
+return $app;
+```
+
+Two things this decides for you. The name comes from `Command::name()`, not the
+filename, so a class called `Vacuum` may be invoked as `db:vacuum`. And commands
+are built by the container, so one may declare what it needs:
+
+```php
+final class Purge implements Command
+{
+    public function __construct(private readonly Application $app) {}
+}
+```
+
+A class in the directory that is not a command is skipped, so `app/Console/` can
+hold helpers, and a directory that does not exist contributes nothing — an
+application with no commands has no `src/Console/`, and that is not an error to
+report.
+
+Discovery belongs in the console's entry point rather than in the application's
+boot, for the same reason the web and console boots are separate methods: `boot()`
+serving traffic knows nothing about what an application chooses to expose on a
+command line.
 
 ## What a module is, in Composer terms
 
