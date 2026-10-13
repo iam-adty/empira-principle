@@ -23,72 +23,58 @@ use Doctrine\DBAL\DriverManager;
  *     $config = DatabaseConfig::fromEnvironment();
  *     $connection = DatabaseConfig::connection($config);
  *
- * Defaults are for *values* only. A driver this class cannot build throws
- * rather than falling back to SQLite, because a connection that quietly opens
- * the wrong database is a working application holding no data.
+ * Defaults are for *values* only. A driver that is not SQLite throws rather than
+ * falling back to it, because a connection that quietly opens the wrong database
+ * is a working application holding no data — and on SQLite, "the wrong database"
+ * is a file that does not exist yet and will be created empty.
  */
 final class DatabaseConfig
 {
     /**
      * The database described by the environment, with the framework's defaults.
      *
-     * @return Config flat `driver`, `database`, `host`, `port`, `username`, `password`
+     * @return Config flat `driver`, `database`
      */
     public static function fromEnvironment(): Config
     {
         return new Config([
             'driver' => $_ENV['DB_DRIVER'] ?? 'sqlite',
             'database' => $_ENV['DB_DATABASE'] ?? ':memory:',
-            'host' => $_ENV['DB_HOST'] ?? '127.0.0.1',
-            'port' => (int) ($_ENV['DB_PORT'] ?? 0),
-            'username' => $_ENV['DB_USERNAME'] ?? '',
-            'password' => $_ENV['DB_PASSWORD'] ?? '',
         ]);
     }
 
     /**
      * DBAL's spelling of the same settings.
      *
-     * The driver names differ on purpose — Doctrine means them, and translating
-     * them anywhere else would be the bug.
+     * **SQLite is the only driver.** Doctrine still does all the work — DBAL
+     * opens the file, ORM maps and queries it, Migrations plans against it — so
+     * none of that is being bypassed by dropping the servers.
+     *
+     * What went is the *mapping* for the other two, and with it the `host`, `port`,
+     * `username` and `password` parameters: those existed only to reach a server,
+     * and with no server driver left there is no code path that reads them.
+     * Keeping the keys would mean publishing configuration the framework silently
+     * ignores, which is how a connection ends up pointing somewhere nobody chose.
+     *
+     * `DB_DRIVER=pgsql` now refuses, by name, rather than quietly opening a
+     * different database — see {@see self::fromEnvironment()}.
      *
      * @return array<string, mixed>
      *
-     * @throws \InvalidArgumentException on a driver DBAL does not have
+     * @throws \InvalidArgumentException on any driver but sqlite
      */
     public static function dbalParameters(Config $config): array
     {
         $driver = strtolower($config->string('driver', 'sqlite'));
 
-        $base = match ($driver) {
-            'sqlite' => ['driver' => 'pdo_sqlite', 'path' => $config->string('database', ':memory:')],
-            'mysql', 'mariadb' => ['driver' => 'pdo_mysql'],
-            'pgsql', 'postgres', 'postgresql' => ['driver' => 'pdo_pgsql'],
-            default => throw new \InvalidArgumentException(sprintf(
-                'Unknown database driver "%s"; expected sqlite, mysql or pgsql.',
+        if ($driver !== 'sqlite') {
+            throw new \InvalidArgumentException(sprintf(
+                'Unknown database driver "%s"; this framework speaks SQLite only.',
                 $driver
-            )),
-        };
-
-        if ($base['driver'] === 'pdo_sqlite') {
-            return $base;
+            ));
         }
 
-        // Port only when one was actually given: a port of 0 is not "port zero",
-        // it is "the driver decides", and passing it through is how a connection
-        // to a socket-only server starts failing on a machine that used to work.
-        $parameters = [
-            'host' => $config->string('host', '127.0.0.1'),
-            'dbname' => $config->string('database', ''),
-            'user' => $config->string('username', ''),
-            'password' => $config->string('password', ''),
-        ];
-
-        if ($config->int('port', 0) > 0) {
-            $parameters['port'] = $config->int('port', 0);
-        }
-
-        return $base + $parameters;
+        return ['driver' => 'pdo_sqlite', 'path' => $config->string('database', ':memory:')];
     }
 
     /**

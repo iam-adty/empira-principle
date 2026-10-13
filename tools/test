@@ -1,90 +1,71 @@
 #!/usr/bin/env bash
 #
-# Run the test suite in Docker.
+# Run the test suite on the host PHP.
 #
-# The rule this script exists to enforce: a green suite means the database
-# tests actually ran. A Postgres suite that silently skipped is a green tick
-# that means nothing, so the services are checked, started, and waited on —
-# and if they cannot be started, this stops and says so rather than reporting
-# a pass.
+#     tools/test [phpunit arguments]
 #
-# And a green exit status means the suite *finished*. PHPUnit chooses that
-# status in ShellExitCodeCalculator, which nothing reaches if the process exits
-# first — so an `exit` anywhere in the code under test truncates the run, prints
-# no summary, and exits 0. Measured, not assumed: a fixture with an `exit` in
-# it stopped the suite after three tests and still returned success. Hence the
-# summary check below, which is the only thing standing between that and a gate
-# that means nothing.
+# ## Why this runs on the host
+#
+# It used to run in Docker, against PostgreSQL, and the container was not
+# incidental: 480 of the 485 tests never needed a server. `OrmLifecycleTest` and
+# `WorkerTest` both configure `['driver' => 'sqlite', …]` themselves. The five
+# that did — `PostgresTest` — were the only tests in the suite that reached for a
+# database over a socket, and they are gone.
+#
+# So paying for a daemon, an image and a container per run, to exercise tests
+# that open a file, was the whole cost. The suite is SQLite now and runs in about
+# half a second with nothing started, stopped or waited on.
+#
+# Doctrine is still underneath all of it: DBAL opens the connection, ORM maps and
+# queries it, Migrations plans against it. Nothing is stubbed, and the persistence
+# tests assert against a real EntityManager over a real database.
+#
+# ## What this script still refuses to let happen
+#
+# A green suite that ran nothing, or ran part of itself.
+#
+# PHPUnit picks its exit status in `ShellExitCodeCalculator`, which nothing
+# reaches if the process exits first — so an `exit` anywhere in the code under
+# test truncates the run, prints no summary, and returns **0**. Measured, not
+# assumed: a fixture with an `exit` in it stopped the suite after 21 tests and
+# `composer test` still succeeded. Two failures are covered:
+#
+#   * nothing ran at all — `failOnEmptyTestSuite` in phpunit.xml, which gives the
+#     right exit code and PHPUnit's own message
+#   * the run stopped early — the summary check below
+#
+# Neither has anything to do with Docker. Dropping the container took away the
+# daemon checks; it did not take away the reason this file exists.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if ! command -v docker > /dev/null 2>&1; then
+if [ ! -x vendor/bin/phpunit ]; then
     cat >&2 <<'MESSAGE'
-Docker is not on PATH, so the suite cannot run.
+vendor/bin/phpunit is missing, so the suite cannot run.
 
-The whole suite runs in Docker. Install Docker, or run the SQLite-only
-tests directly on a host PHP that has the extensions:
+    composer install
 
-    vendor/bin/phpunit --exclude-group driver
+The suite needs a host PHP with `pdo_sqlite` and `mbstring`. It needs no server
+and no container.
+MESSAGE
+    exit 1
+fi
+
+if ! php -r 'exit(extension_loaded("pdo_sqlite") ? 0 : 1);'; then
+    cat >&2 <<'MESSAGE'
+This PHP has no pdo_sqlite, and SQLite is the only database this framework
+speaks — so the persistence tests cannot run here.
+
+Check with:
+
+    php -m | grep pdo_sqlite
 
 MESSAGE
     exit 1
 fi
 
-if ! docker info > /dev/null 2>&1; then
-    cat >&2 <<'MESSAGE'
-The Docker daemon is not responding.
-
-Start Docker (Docker Desktop, or `sudo systemctl start docker`) and run this
-command again.
-MESSAGE
-    exit 1
-fi
-
-# Anything up already? `ps --status running` is the question that matters; the
-# exit status of this command is deliberately ignored.
-running=$(docker compose ps --status running --services 2>/dev/null || true)
-
-if ! grep -qx postgres <<< "$running"; then
-    echo "Starting the database services..." >&2
-
-    if ! docker compose up -d --wait postgres; then
-        cat >&2 <<'MESSAGE'
-
-The PostgreSQL service did not come up. The suite cannot be trusted without it,
-so nothing has been run.
-
-To see what went wrong:
-
-    docker compose logs postgres
-
-Once it is up, start it yourself and re-run:
-
-    docker compose up -d --wait postgres
-    composer test
-
-MESSAGE
-        exit 1
-    fi
-fi
-
-# `--name` because the runner is a one-off container: Compose ignores
-# `container_name` for these, so `docker ps` would otherwise show a generated
-# `empira-principle-php-run-<hash>`. The name is worth having for `docker logs`
-# while a run is in flight.
-#
-# Deliberately no `--build`. The source is mounted from the host, so an edit is
-# an edit in the runner and the image is built once, not per run.
-#
-# The autoloader is regenerated first, in the same container, because
-# `tests/Fixtures/` is **classmapped** rather than PSR-4 — several fixtures share
-# one file — and the classmap in `vendor/` was generated when the image was
-# built. Without this, adding a fixture file means the runner cannot find the
-# class, and the only cure is a rebuild, which contradicts mounting the source
-# so that an edit needs no rebuild in the first place.
-#
 # `--colors=never` because phpunit.xml asks for colours and the summary check
 # below would be matching ANSI escape codes instead of a line of text.
 log=$(mktemp)
@@ -93,17 +74,15 @@ trap 'rm -f "$log"' EXIT
 # `set -e` would abandon the pipeline the moment PHPUnit returned non-zero,
 # taking the summary check with it, so the status is captured instead.
 status=0
-docker compose run --name empira-principle --rm php \
-    sh -c 'composer dump-autoload --no-interaction --quiet && exec vendor/bin/phpunit --colors=never "$@"' \
-    _ "$@" 2>&1 | tee "$log" || status=${PIPESTATUS[0]}
+vendor/bin/phpunit --colors=never "$@" 2>&1 | tee "$log" || status=${PIPESTATUS[0]}
 
 if [ "$status" -ne 0 ]; then
     exit "$status"
 fi
 
-# PHPUnit reached its end and reported. `OK (...)` is a clean run and
-# `Tests: ...` is a run with failures — but the latter already exited non-zero
-# above, so at this point the absence of either means the process ended early.
+# `OK (...)` is a clean run and `Tests: ...` is a run with failures — but the
+# latter already exited non-zero above, so at this point the absence of either
+# means the process ended early.
 if ! grep -qE '^(OK|Tests:)' "$log"; then
     cat >&2 <<'MESSAGE'
 

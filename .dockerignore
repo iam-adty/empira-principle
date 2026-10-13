@@ -1,8 +1,0 @@
-.git
-.github
-vendor
-composer.lock
-.phpunit.result.cache
-.phpunit.cache
-*.md
-!README.md

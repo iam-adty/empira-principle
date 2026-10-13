@@ -76,42 +76,82 @@ final class MigrationsTest extends TestCase
     {
         // Both the command and the runtime read DB_* through this one reader, so
         // "which database" cannot have two answers that disagree.
-        $_ENV['DB_DRIVER'] = 'pgsql';
-        $_ENV['DB_DATABASE'] = 'somewhere';
-        $_ENV['DB_HOST'] = 'elsewhere';
+        $_ENV['DB_DRIVER'] = 'sqlite';
+        $_ENV['DB_DATABASE'] = '/tmp/somewhere.sqlite';
 
         $fromEnv = DatabaseConfig::fromEnvironment();
 
-        self::assertSame('pgsql', $fromEnv->string('driver'));
-        self::assertSame('somewhere', $fromEnv->string('database'));
-        self::assertSame('elsewhere', $fromEnv->string('host'));
+        self::assertSame('sqlite', $fromEnv->string('driver'));
+        self::assertSame('/tmp/somewhere.sqlite', $fromEnv->string('database'));
 
         // …and what Doctrine is handed is derived from that, not read again.
         $parameters = DatabaseConfig::dbalParameters($fromEnv);
 
-        self::assertSame('pdo_pgsql', $parameters['driver']);
-        self::assertSame('somewhere', $parameters['dbname']);
-        self::assertSame('elsewhere', $parameters['host']);
+        self::assertSame('pdo_sqlite', $parameters['driver']);
+        self::assertSame('/tmp/somewhere.sqlite', $parameters['path']);
     }
 
-    public function testAnUnknownDriverIsRefusedRatherThanDefaultedToSqlite(): void
+    /**
+     * A driver that is not SQLite is refused **by name**, and it is refused
+     * rather than ignored.
+     *
+     * `pgsql` and `mysql` are the interesting cases, because they used to work:
+     * they are in this test rather than `oracle` alone because a driver that is
+     * removed and a driver that never existed are different mistakes, and only
+     * the first one can reach a running application. Falling back to SQLite would
+     * be worse than either — an application configured for PostgreSQL would come
+     * up against an empty file and report that it had no data, which is a working
+     * application holding nothing.
+     *
+     * @dataProvider refusedDrivers
+     */
+    public function testAnUnsupportedDriverIsRefusedRatherThanDefaultedToSqlite(string $driver): void
     {
-        // A connection that quietly opens the wrong database is a working
-        // application holding no data, which is the worst failure available.
         $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Unknown database driver "%s"', $driver));
 
-        DatabaseConfig::dbalParameters(new Config(['driver' => 'oracle']));
+        DatabaseConfig::dbalParameters(new Config(['driver' => $driver]));
     }
 
-    public function testAPortOfZeroIsLeftOutSoTheDriverDecides(): void
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function refusedDrivers(): array
     {
-        $parameters = DatabaseConfig::dbalParameters(new Config([
-            'driver' => 'pgsql',
-            'database' => 'app',
-            'port' => 0,
-        ]));
+        return [
+            'postgres' => ['pgsql'],
+            'postgres long' => ['postgresql'],
+            'mysql' => ['mysql'],
+            'never supported' => ['oracle'],
+        ];
+    }
 
-        self::assertArrayNotHasKey('port', $parameters);
+    /**
+     * The server parameters are gone, and this is why that is visible.
+     *
+     * `DB_HOST`, `DB_PORT`, `DB_USERNAME` and `DB_PASSWORD` used to be read and
+     * forwarded to DBAL. They are no longer read at all, and publishing keys the
+     * framework ignores is how a connection ends up pointing somewhere nobody
+     * chose — so the reader's shape is asserted, not just the driver.
+     */
+    public function testServerSettingsAreNoLongerPartOfTheConfiguration(): void
+    {
+        $_ENV['DB_HOST'] = 'elsewhere';
+        $_ENV['DB_USERNAME'] = 'someone';
+
+        try {
+            $config = DatabaseConfig::fromEnvironment();
+
+            self::assertNull($config->get('host'));
+            self::assertNull($config->get('username'));
+
+            $parameters = DatabaseConfig::dbalParameters($config);
+
+            self::assertArrayNotHasKey('host', $parameters);
+            self::assertArrayNotHasKey('user', $parameters);
+        } finally {
+            unset($_ENV['DB_HOST'], $_ENV['DB_USERNAME']);
+        }
     }
 
     // ---------------------------------------------------- what it does to it
