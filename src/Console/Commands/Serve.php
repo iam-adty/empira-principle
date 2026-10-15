@@ -10,11 +10,29 @@ use Empira\Console\Output;
 /**
  * Runs the PHP built-in web server against an application's `public/`.
  *
- * There is no custom server here, and there should not be one. `php -S` already
- * does the only two jobs this needs: serve the static files under `public/`, and
- * hand every other path to the front controller as a router script. All this
- * command adds is the right arguments, printed so the user can see — and
- * re-run — exactly what was started.
+ * There is no custom server here, and there should not be one. `php -S` does the
+ * one job this needs: hand every request to the front controller as a router
+ * script, and serve the static files under `public/` itself.
+ *
+ * The second half is **the front controller's job, not `php -S`'s**, and this
+ * command's own docblock used to say otherwise. A router script runs at the
+ * start of *every* request; falling through to the requested file is something
+ * it has to ask for explicitly, by returning `false`. An application that does
+ * not will answer `public/`'s own assets itself, find no route for them, and
+ * 404 — a failure that is invisible under nginx, where the web server serves
+ * those files before PHP is involved at all.
+ *
+ * So an application front controller needs, above its autoloader:
+ *
+ *     if (PHP_SAPI === 'cli-server') {
+ *         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+ *         if ($path !== null && $path !== '/' && is_file(__DIR__ . $path)) {
+ *             return false;
+ *         }
+ *     }
+ *
+ * All this command adds is the right arguments, printed so the user can see —
+ * and re-run — exactly what was started.
  */
 final class Serve implements Command
 {
