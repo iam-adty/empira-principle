@@ -154,6 +154,16 @@ final class Application
             $this->commands['migrate']->withModuleMigrations($this->booted->migrationSources());
         }
 
+        // `route:list` needs the same application this console already booted, and
+        // it must not go looking for a file to load it from: the conventional
+        // `src/App.php` is a class file the autoloader has already loaded, so
+        // requiring it redeclares the class and fatals. That is a bug this
+        // command shipped with, on every application following the documented
+        // layout.
+        if ($this->booted !== null && isset($this->commands['route:list'])) {
+            $this->commands['route:list']->withBootedApplication($this->booted);
+        }
+
         return $commands[$command]->handle(self::options($arguments), $output);
     }
 

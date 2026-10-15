@@ -14,16 +14,26 @@ use Empira\Routing\RouteCollection;
 /**
  * Prints the route table of an application.
  *
- * Routes only exist once an application has been built, so this command loads
- * one from a file rather than guessing. That file may return the `Application`
+ * Routes only exist once an application has been built, and there are two ways
+ * to get one. Normally the console already has it — `bin/empira` boots the
+ * project before it dispatches anything, because it has to, in order to find the
+ * project's own commands — and this command is simply handed it. See
+ * {@see withBootedApplication()}.
+ *
+ * Failing that it loads one from a file. That file may return the `Application`
  * itself, a `RouteCollection`, or a closure that fills one — or declare a class
  * with a static `boot()`, which is how a real application is written:
  *
  *     $app = App::boot();
  *
- * So `route:list` with no arguments reads `src/App.php` in the target
- * directory and boots it, which means the table it prints is the table the
- * application actually serves — discovered attributes and all.
+ * **It does not default to `src/App.php`, which is what broke it.** That file is
+ * a class file, and `require` has no include-once semantics: a class file the
+ * autoloader has already loaded is executed a second time and PHP refuses to
+ * declare the class again. `bootstrap/app.php` is preferred instead, and it is
+ * safe twice over — an application's bootstrap is written to return the booted
+ * `Application` rather than exit precisely so the console can require it more
+ * than once, and it hands back the object rather than making us guess which
+ * declared class boots it.
  *
  * Anything that goes wrong on the way — a missing file, a fatal error in the
  * bootstrap, a file that returns something unexpected — is reported as a
@@ -32,6 +42,26 @@ use Empira\Routing\RouteCollection;
  */
 final class RouteList implements Command
 {
+    /** Set by the console when it has already booted the project. */
+    private ?Application $booted = null;
+
+    /**
+     * Use the application the console already built.
+     *
+     * This is the normal path and it requires nothing, which is the whole point:
+     * `bin/empira` boots the project before dispatch in order to discover its
+     * commands, so by the time any command runs the application exists. Loading
+     * a second one to read a route table out of it is what caused a fatal
+     * redeclaration, because the conventional class file had already been
+     * autoloaded.
+     */
+    public function withBootedApplication(Application $application): self
+    {
+        $this->booted = $application;
+
+        return $this;
+    }
+
     public function name(): string
     {
         return 'route:list';
@@ -49,27 +79,36 @@ final class RouteList implements Command
 
     public function handle(array $options, Output $output): int
     {
-        $path = self::app($options);
+        // The console booted the project before it got here, so this is the
+        // ordinary case and nothing is loaded a second time.
+        $loaded = $this->booted;
 
-        if (!is_file($path)) {
-            $output->error(sprintf(
-                'No application bootstrap at %s. Pass --app=path/to/app.php — a file returning an Application, a RouteCollection, or a closure that registers routes.',
-                $path
-            ));
+        if ($loaded === null) {
+            $path = self::app($options);
 
-            return 1;
-        }
+            if (!is_file($path)) {
+                $output->error(sprintf(
+                    'No application bootstrap at %s. Pass --app=path/to/app.php — a file returning an Application, a RouteCollection, or a closure that registers routes.',
+                    $path
+                ));
 
-        try {
-            self::loadProjectAutoloader($path);
+                return 1;
+            }
 
-            $before = get_declared_classes();
-            $loaded = require $path;
+            try {
+                self::loadProjectAutoloader($path);
+
+                $before = get_declared_classes();
+                $loaded = require $path;
+            } catch (\Throwable $e) {
+                $output->error(sprintf('Could not load %s: %s', $path, $e->getMessage()));
+
+                return 1;
+            }
+
             $routes = self::routes($loaded) ?? self::routesFromBootable(array_diff(get_declared_classes(), $before));
-        } catch (\Throwable $e) {
-            $output->error(sprintf('Could not load %s: %s', $path, $e->getMessage()));
-
-            return 1;
+        } else {
+            $routes = self::routes($loaded);
         }
 
         if ($routes === null) {
@@ -129,11 +168,17 @@ private static function loadProjectAutoloader(string $path): void
     }
 
     /**
-     * The bootstrap file: `--app`, else `<target>/src/App.php`.
+     * The bootstrap file: `--app`, else the first of these that exists.
      *
-     * The application is the conventional place for routes to be declared, so
-     * that is the default; a project keeping its routes in `routes.php` still
-     * works by passing `--app=` or `--target=`.
+     * `bootstrap/app.php` comes first because it is the safe one. It returns the
+     * booted `Application`, and an application's bootstrap is written to be
+     * required more than once — requiring it is how the console hands the object
+     * around at all.
+     *
+     * `src/App.php` comes second and only as a fallback, because requiring a
+     * class file the autoloader has already loaded redeclares the class and
+     * fatals. That was not theoretical: it is what `route:list` did, for every
+     * application following the documented layout.
      *
      * @param array<string, mixed> $options
      */
@@ -148,9 +193,15 @@ private static function loadProjectAutoloader(string $path): void
         $target = rtrim(trim((string) ($options['target'] ?? '')), '/');
         $target = $target === '' ? (getcwd() ?: '.') : $target;
 
-        $conventional = $target . '/src/App.php';
+        foreach (['/bootstrap/app.php', '/src/App.php', '/routes.php'] as $conventional) {
+            if (is_file($target . $conventional)) {
+                return $target . $conventional;
+            }
+        }
 
-        return is_file($conventional) ? $conventional : $target . '/routes.php';
+        // Nothing exists; return the conventional name so the error names
+        // somewhere sensible rather than an empty string.
+        return $target . '/bootstrap/app.php';
     }
 
     /**

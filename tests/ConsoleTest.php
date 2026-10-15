@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Empira\Tests;
 
 use Empira\Console\Application;
+use Empira\Console\Bootstrap;
 use Empira\Console\Commands\Serve;
 use Empira\Console\Output;
 use PHPUnit\Framework\TestCase;
@@ -211,6 +212,100 @@ final class ConsoleTest extends TestCase
         $this->assertStringContainsString('/posts', $result['output']);
         $this->assertStringContainsString('posts.store', $result['output']);
         $this->assertStringContainsString('App\Controllers\PostsController@store', $result['output']);
+    }
+
+    /**
+     * The documented application layout, run the way `bin/empira` runs it.
+     *
+     * **This is the test that was missing, and its absence is why the bug
+     * shipped.** `bin/empira` boots the project before dispatching, so
+     * `bootstrap/app.php` is required and `src/App.php` is autoloaded. A
+     * `route:list` that then required the class file again redeclared the class
+     * and fataled — for every application following the documented layout.
+     *
+     * The helper above calls `Application->run()` in-process and never boots
+     * anything, so it cannot see the collision. `Bootstrap::boot()` below is the
+     * step it omits, and it is the whole point of this test: without it, this
+     * fixture passes against the broken code.
+     */
+    public function testRouteListOnAConventionalApplicationDoesNotRedeclareItsClass(): void
+    {
+        $target = $this->conventionalApp('FixtureBooted');
+        $booted = Bootstrap::boot($target);
+
+        // FQN on purpose: `Application` is the *console* one in this file.
+        $this->assertInstanceOf(\Empira\Application::class, $booted, 'the fixture did not boot');
+
+        $result = $this->console(['empira', 'route:list', '--target=' . $target]);
+
+        $this->assertSame(0, $result['code'], $result['output']);
+        $this->assertStringContainsString('dashboard', $result['output']);
+    }
+
+    /**
+     * The console hands over the application it already built.
+     *
+     * With `bootstrap/app.php` present and required exactly once, this passes
+     * whether or not `route:list` loads anything — so it is paired with the
+     * redeclaration test above rather than standing in for it.
+     */
+    public function testRouteListUsesTheApplicationTheConsoleAlreadyBooted(): void
+    {
+        $target = $this->conventionalApp('FixtureUntouched');
+
+        $this->assertFileExists($target . '/src/App.php');
+
+        $result = $this->console(['empira', 'route:list', '--target=' . $target]);
+
+        $this->assertSame(0, $result['code'], 'output was: ' . $result['output']);
+        $this->assertStringContainsString('dashboard', $result['output']);
+    }
+
+    /**
+     * A target with only a class file, no bootstrap.
+     *
+     * The conventional fallback, which is the other half of the search order and
+     * had no test at all: the suite previously used `routes.php` for everything,
+     * so the `src/App.php` branch was never exercised.
+     */
+    public function testRouteListFallsBackToAClassFileWhenThereIsNoBootstrap(): void
+    {
+        $target = $this->tempdir();
+
+        mkdir($target . '/src', 0o777, true);
+        file_put_contents($target . '/src/App.php', <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            namespace FixtureOnly;
+
+            use Empira\Application as EmpiraApplication;
+            use Empira\Routing\RouteCollection;
+            use Empira\Routing\RouteRegistrar;
+
+            final class OnlyRoutes implements RouteRegistrar
+            {
+                public function register(RouteCollection $routes): void
+                {
+                    $routes->get('/only', static fn(): string => 'only', 'only');
+                }
+            }
+
+            final class StandaloneApp
+            {
+                public static function boot(): EmpiraApplication
+                {
+                    return (new EmpiraApplication('a-secret-long-enough-for-signing'))
+                        ->registrar(OnlyRoutes::class);
+                }
+            }
+            PHP);
+
+        $result = $this->console(['empira', 'route:list', '--target=' . $target]);
+
+        $this->assertSame(0, $result['code'], $result['output']);
+        $this->assertStringContainsString('only', $result['output']);
     }
 
     public function testRouteListFindsTheApplicationInTheTargetDirectory(): void
@@ -486,6 +581,99 @@ final class ConsoleTest extends TestCase
         $this->assertIsString($output);
 
         return ['code' => $code, 'output' => $output];
+    }
+
+    /**
+     * A temporary application in the layout the framework documents: a class in
+     * `src/App.php`, reached through `bootstrap/app.php`.
+     *
+     * Both files, because the collision this exists to catch needs both — the
+     * bootstrap declares nothing itself, it requires the class through the
+     * autoloader, and a `route:list` that requires the class file again is what
+     * fatals.
+     */
+    private function conventionalApp(string $namespace): string
+    {
+        $target = $this->tempdir();
+
+        mkdir($target . '/src', 0o777, true);
+        mkdir($target . '/bootstrap', 0o777, true);
+
+        // The namespace is a parameter because class declarations are process
+        // global: two fixtures declaring the same class into two different temp
+        // directories is a redeclaration, which is the very failure these tests
+        // exist to rule out.
+        //
+        // One class per file, mapped PSR-4, because that is what makes the
+        // autoloader below behave the way a real application's does.
+        file_put_contents($target . '/src/FixtureRoutes.php', str_replace('__NS__', $namespace, <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            namespace __NS__;
+
+            use Empira\Routing\RouteCollection;
+            use Empira\Routing\RouteRegistrar;
+
+            final class FixtureRoutes implements RouteRegistrar
+            {
+                public function register(RouteCollection $routes): void
+                {
+                    $routes->get('/dashboard', static fn(): string => 'dashboard', 'dashboard');
+                }
+            }
+            PHP));
+
+        file_put_contents($target . '/src/App.php', str_replace('__NS__', $namespace, <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            namespace __NS__;
+
+            use Empira\Application as EmpiraApplication;
+
+            final class App
+            {
+                public static function boot(): EmpiraApplication
+                {
+                    return (new EmpiraApplication('a-secret-long-enough-for-signing'))
+                        ->registrar(FixtureRoutes::class);
+                }
+            }
+            PHP));
+
+        // An autoloader, because that is what makes an application's bootstrap
+        // safe to require more than once — not the bootstrap being written that
+        // way. Composer's loader will not load a class it has already declared,
+        // so a real `bootstrap/app.php` can be required twice without harm. A
+        // fixture that `require`s its class file directly would fatal on the
+        // second require for reasons a real application never hits, and would
+        // be testing the fixture rather than the command.
+        file_put_contents($target . '/bootstrap/app.php', str_replace('__NS__', $namespace, <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            spl_autoload_register(static function (string $class): void {
+                if (!str_starts_with($class, '__NS__\\')) {
+                    return;
+                }
+
+                $file = __DIR__ . '/../src/'
+                    . str_replace('\\', '/', substr($class, strlen('__NS__\\')))
+                    . '.php';
+
+                if (is_file($file)) {
+                    require $file;
+                }
+            });
+
+            return __NS__\App::boot();
+            PHP));
+
+        return $target;
     }
 
     /**
