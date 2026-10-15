@@ -1,6 +1,6 @@
 # Architecture
 
-> **Status: describes shipped code.** Verified against `487 tests, 1089 assertions`.
+> **Status: describes shipped code.** Verified against `490 tests, 1103 assertions`.
 > Planned changes are in [SPEC.md](https://github.com/iam-adty/empira-dev/blob/main/planning/SPEC.md).
 
 How a request flows through Empira, and why it is built this way.
