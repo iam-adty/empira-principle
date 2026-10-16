@@ -71,8 +71,6 @@ final class TestClient
     {
     }
 
-    // ---------------------------------------------------------------- verbs
-
     /**
      * @param array<string, string> $headers
      */
@@ -116,8 +114,6 @@ final class TestClient
     {
         return $this->pending('DELETE', $uri, $body, $headers);
     }
-
-    // ---------------------------------------------------------------- options
 
     /**
      * Mark the next request as an ordinary page load rather than an htmx swap.
@@ -172,8 +168,6 @@ final class TestClient
     {
         return $this->app;
     }
-
-    // ---------------------------------------------------------------- internals
 
     /**
      * @param array<string, mixed>  $body

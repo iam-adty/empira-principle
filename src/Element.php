@@ -52,8 +52,6 @@ final class Element implements \Stringable
         }
     }
 
-    // ---------------------------------------------------------------- structure
-
     public function append(Element|Raw|string|int|float|bool|null ...$children): self
     {
         foreach ($children as $child) {
@@ -93,8 +91,6 @@ final class Element implements \Stringable
 
         return $this;
     }
-
-    // ---------------------------------------------------------------- attributes
 
     public function attr(string $name, mixed $value = true): self
     {
@@ -167,8 +163,6 @@ final class Element implements \Stringable
         return $this->attr('data-' . $key, $value);
     }
 
-    // ---------------------------------------------------------------- htmx verbs
-
     public function hxGet(string $url): self
     {
         return $this->attr('hx-get', $url);
@@ -193,8 +187,6 @@ final class Element implements \Stringable
     {
         return $this->attr('hx-delete', $url);
     }
-
-    // ---------------------------------------------------------------- htmx modifiers
 
     public function hxTarget(string $selector, ?string $swap = null): self
     {
@@ -321,8 +313,6 @@ final class Element implements \Stringable
         return $this->attr('hx-swap-oob', $swap);
     }
 
-    // ---------------------------------------------------------------- component actions
-
     public function withResolver(?Closure $resolver): self
     {
         $this->resolver = $resolver;
@@ -397,8 +387,6 @@ final class Element implements \Stringable
         return $this->action($action, ['method' => 'GET'] + $options);
     }
 
-    // ---------------------------------------------------------------- accessors
-
     public function getTag(): string
     {
         return $this->tag;
@@ -428,8 +416,6 @@ final class Element implements \Stringable
     {
         return in_array($this->tag, self::VOID_TAGS, true);
     }
-
-    // ---------------------------------------------------------------- rendering
 
     public function render(): string
     {
@@ -520,8 +506,6 @@ final class Element implements \Stringable
             ? $child
             : Html::escape($child);
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private static function normalizeTag(string $tag): string
     {

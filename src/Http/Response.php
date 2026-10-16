@@ -114,8 +114,6 @@ final class Response implements ResponseInterface
         return new self('', 286);
     }
 
-    // ------------------------------------------------------------------- PSR-7
-
     public function getStatusCode(): int
     {
         return $this->status;
@@ -274,8 +272,6 @@ final class Response implements ResponseInterface
         return $new;
     }
 
-    // ------------------------------------------------------------ empira's own
-
     /**
      * The body as a string, for this package's own convenience.
      *
@@ -342,8 +338,6 @@ final class Response implements ResponseInterface
 
         return $headers;
     }
-
-    // ------------------------------------------------------------ htmx response headers
 
     /** Add the browser URL to the history stack (pass `false` to opt out). */
     public function pushUrl(string|bool $url = true): self

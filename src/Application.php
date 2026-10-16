@@ -539,38 +539,56 @@ final class Application
     }
 
     /**
-     * Route a request and produce a response.
+     * Answer one request.
      *
      * Component action traffic is matched first, because those URLs live under
      * a reserved prefix; then named routes, then the fallback.
-     */
-    /**
-     * Answer one request.
      *
      * Typed as PSR-7's `ServerRequestInterface` rather than this package's
      * {@see Request}, so a PSR-15 consumer can drive an Empira application
      * directly and get one of these back. The concrete types still work — they
      * implement the interface — and everything downstream narrows with
      * {@see Request::of()} if it needs the htmx conveniences.
+     *
+     * ## Why the resets at the top are here
+     *
+     * An `Application` outlives the request in a long-running worker, and two
+     * pieces of state outlive it *wrongly*.
+     *
+     * **The session.** The lock and the write-back belong to one request, not to
+     * whichever one this worker serves next. The reason lives in
+     * {@see Session::beginRequest()}, which is where the reset happens.
+     *
+     * **The ORM's identity map.** Every entity an `EntityManager` has loaded
+     * stays loaded, and asking for one again returns the old object without
+     * touching the database. Under php-fpm that is invisible, because the
+     * process ends with the request. Under a worker it means request two is
+     * served request one's user — silently, with nothing in any log. `clear()`
+     * detaches everything rather than closing the manager, so the next request
+     * reads from the database again and the connection is still the one opened
+     * at boot.
+     *
+     * The same reset covers {@see RouteParams}: `/todos/7` must not leave its
+     * `id` behind for the next request that matches nothing.
+     *
+     * The format is negotiated once, up front: `Request` is immutable, so it is
+     * a property of this dispatch rather than something mutated onto it later.
+     *
+     * ## Why `RequestUser` is bound here and not by the auth module
+     *
+     * Per request, not per application, and bound under its **own** contract
+     * rather than the auth module's façade — so anything that only needs to ask
+     * "who is this" works with whatever `Identity` a guard produced, including
+     * one from a module this framework has never heard of. The auth module binds
+     * its own `Auth`, which narrows to a `User` and adds login/logout; core does
+     * not know that class exists.
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         $request = Request::of($request);
-        // An Application outlives the request in a long-running worker, and the
-        // session is the one piece of state where that outlives *wrongly* — see
-        // Session::beginRequest(), which is why the reason lives there.
+
         $this->container->get(Session::class)->beginRequest();
 
-        // The ORM's equivalent, and for the same reason. An EntityManager
-        // keeps an **identity map**: every entity it has loaded stays loaded,
-        // and asking for one of them again returns the old object without
-        // touching the database. Under php-fpm that is invisible, because the
-        // process ends with the request. Under a worker it means request two is
-        // served request one's user — silently, with nothing in any log.
-        //
-        // `clear()` detaches everything rather than closing the manager, so the
-        // next request reads from the database again and the connection is
-        // still the one opened at boot.
         if ($this->container->bound(EntityManagerInterface::class)) {
             $this->container->get(EntityManagerInterface::class)->clear();
         }
@@ -578,15 +596,10 @@ final class Application
         $context = $this->makeContext($request);
         $this->context = $context;
 
-        // Negotiated once, up front: `Request` is immutable, so the format is a
-        // property of this dispatch rather than something mutated onto it later.
         $this->format = $request->accepts('application/json', ['text/html'])
             ? Format::Json
             : Format::Html;
 
-        // Reset per request: an Application instance outlives the request in tests and
-        // in long-running workers, and `/todos/7` must not leave its `id` behind
-        // for the next request that matches nothing.
         $this->params = new RouteParams();
 
         $this->container->instance(Request::class, $request);
@@ -595,12 +608,6 @@ final class Application
         $this->container->instance(Format::class, $this->format);
         $this->container->instance(RouteParams::class, $this->params);
 
-        // Per request, not per application: see auth(). Bound under its *own*
-        // contract and built here in core, so anything that only needs to ask
-        // "who is this" works with whatever `Identity` a guard produced —
-        // including one from a module this framework has never heard of. The
-        // auth module binds its own façade (`Auth`), which narrows to a `User`
-        // and adds login/logout; core does not know that class exists.
         $this->container->instance(RequestUser::class, new RequestUser($this->guards, $request));
 
         try {

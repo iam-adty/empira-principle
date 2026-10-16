@@ -133,8 +133,6 @@ public static function capture(bool $trustProxy = false): self
         );
     }
 
-    // ------------------------------------------------------------------- PSR-7
-
     /**
      * Narrow a PSR request back to this framework's own.
      *
@@ -620,8 +618,6 @@ public static function capture(bool $trustProxy = false): self
         return is_bool($value) ? $value : filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $default;
     }
 
-    // ------------------------------------------------------------ htmx request headers
-
     /** `HX-Request` — the request came from htmx. */
     public function isHtmx(): bool
     {
@@ -675,8 +671,6 @@ public static function capture(bool $trustProxy = false): self
     {
         return $this->header('x-csrf-token') ?? $this->string('_csrf');
     }
-
-    // ------------------------------------------------------------ content negotiation
 
     /**
      * Does this client prefer `$type` over the `$betterThan` alternatives?

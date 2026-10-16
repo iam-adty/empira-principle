@@ -105,6 +105,17 @@ abstract class Component
     /** The id that default `hx-target` attributes aim at. */
     private string $targetId;
 
+    /**
+     * Everything a component needs to exist, and the wiring that makes its
+     * elements resolve.
+     *
+     * The element factory's defaults are **closures rather than strings**,
+     * because two of the three cannot be known yet: a component may name its own
+     * root element, and that id only exists once `render()` has produced it.
+     * Resolving them eagerly would mean every component declared a target it did
+     * not control, and `hx-target` would point at the wrong element for anyone
+     * who overrode `id()`.
+     */
     final public function __construct(
         protected readonly Context $context,
         array $props = [],
@@ -115,10 +126,6 @@ abstract class Component
         $this->targetId = $this->id();
         $this->request = $context->request;
 
-        // Every element built by this component can resolve `->action('name')`
-        // into a signed endpoint. The default target is a closure because a
-        // component may name its own root element, and that is only known once
-        // `render()` has produced it.
         $this->hx = (new ElementFactory())->withResolver(
             fn(string $action): string => $this->endpoint($action),
             [
@@ -128,8 +135,6 @@ abstract class Component
             ],
         );
     }
-
-    // ---------------------------------------------------------------- rendering
 
     /**
      * Build the component's HTML.
@@ -438,8 +443,6 @@ protected function swapsIndependently(): bool
         return PropBag::flush($this, $this->props);
     }
 
-    // ---------------------------------------------------------------- lifecycle
-
     /**
      * Load any server-side state. Called after construction and before the
      * first render, and again before every action.
@@ -528,8 +531,6 @@ protected function swapsIndependently(): bool
     {
     }
 
-    // ---------------------------------------------------------------- conveniences
-
     /**
      * Queue a message for the next request.
      *
@@ -552,18 +553,19 @@ protected function swapsIndependently(): bool
      *         return;   // the component re-renders, now showing the errors
      *     }
      *
+     * A failure also queues an `invalid` event carrying the errors, so a client
+     * can mark the offending fields. **Only a failure does** — an event on every
+     * successful action would be noise, and a client listening for one would have
+     * to filter anyway.
+     *
      * @param array<string, string|list<string>> $rules
      */
     protected function validate(array $rules, ?array $data = null): ErrorBag
     {
         $errors = Validator::make($data ?? $this->request->all(), $rules);
 
-        // Only announce a failure: an event on every successful action would be
-        // noise, and a client that listens for it would have to filter anyway.
         if ($errors->any()) {
-            // The result has to be kept: `triggerAfterSwap()` returns a modified
-            // copy, and a component that called it and dropped the result queued
-            // nothing at all.
+            // The modified copy has to be kept — see {@see updateResponse()}.
             $this->updateResponse($this->response()->triggerAfterSwap(
                 $this->eventName('invalid'),
                 $errors->jsonSerialize(),
@@ -626,8 +628,6 @@ protected function swapsIndependently(): bool
         return $this->context->container ?? new Container();
     }
 
-    // ---------------------------------------------------------------- identity
-
     /**
      * The component's DOM id, which is also its default `hx-target`.
      */
@@ -675,8 +675,6 @@ protected function swapsIndependently(): bool
             . '/' . rawurlencode($this->token())
             . '/' . rawurlencode($action);
     }
-
-    // ---------------------------------------------------------------- props
 
     protected function hasProp(string $key): bool
     {
@@ -738,8 +736,6 @@ protected function swapsIndependently(): bool
 
         return $this;
     }
-
-    // ---------------------------------------------------------------- context
 
     protected function request(): Request
     {

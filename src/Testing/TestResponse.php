@@ -71,8 +71,6 @@ final class TestResponse
         return $this->response->headers();
     }
 
-    // ---------------------------------------------------------------- status
-
     public function assertOk(): self
     {
         return $this->assertStatus(200);
@@ -100,8 +98,6 @@ final class TestResponse
         return $this;
     }
 
-    // ---------------------------------------------------------------- body
-
     public function assertSee(string $needle): self
     {
         Assert::assertStringContainsString($needle, $this->body(), sprintf(
@@ -123,8 +119,6 @@ final class TestResponse
 
         return $this;
     }
-
-    // ---------------------------------------------------------------- headers
 
     public function assertHeader(string $name, string $value): self
     {
