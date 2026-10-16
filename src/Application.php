@@ -1295,13 +1295,48 @@ class Application
      */
     private function moduleOptions(): array
     {
+        $reflected = new \ReflectionClass(static::class);
+
+        $this->refuseUnresolvableAttributes($reflected);
+
         $options = [];
 
-        foreach ((new \ReflectionClass(static::class))
-            ->getAttributes(ModuleOption::class, \ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
+        foreach ($reflected->getAttributes(ModuleOption::class, \ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
             $options = array_merge($options, $attribute->newInstance()->options());
         }
 
         return $options;
+    }
+
+    /**
+     * Refuse an attribute whose class does not exist.
+     *
+     * PHP records an attribute by **name**, and resolving it is deferred to
+     * `newInstance()`. So `#[LoginPage($page)]` written without the import
+     * becomes `#[App\LoginPage($page)]`, which does not exist, and
+     * `getAttributes(ModuleOption::class, IS_INSTANCEOF)` matches nothing
+     * rather than complaining — the application silently gets its default and
+     * no message about why.
+     *
+     * That is the failure this whole arrangement is supposed to prevent, in a
+     * place where the prevention is nearly free: every attribute on an
+     * application class comes from an installed package, so a missing one is a
+     * missing import, a typo, or a forgotten dependency.
+     */
+    private function refuseUnresolvableAttributes(\ReflectionClass $reflected): void
+    {
+        foreach ($reflected->getAttributes() as $attribute) {
+            $name = $attribute->getName();
+
+            if (! class_exists($name) && ! interface_exists($name) && ! enum_exists($name)) {
+                throw new \LogicException(sprintf(
+                    '%s declares #[%s], which does not exist. Every attribute on an application '
+                    . 'class comes from an installed package, so this is a missing import, a typo, '
+                    . 'or a dependency that is not installed.',
+                    $reflected->getName(),
+                    $name,
+                ));
+            }
+        }
     }
 }

@@ -194,6 +194,13 @@ signal. `alpha` is honestly non-stable and promises nothing about a 1.0 API.
 
 ### Fixed
 
+- **An attribute PHP could not resolve is now refused instead of ignored.** PHP
+  records an attribute by *name* and only resolves it at `newInstance()`, so an
+  attribute written without its import becomes a name in the wrong namespace,
+  `getAttributes(…, IS_INSTANCEOF)` matches nothing, and the application
+  silently gets its default with no message about why. Found by writing
+  `#[LoginPage($page)]` without the import and getting the module's own page.
+
 - **`SqliteStorage` answers a relative path.** It is the framework's default now
   rather than the skeleton's, so `dirname(__DIR__)` resolves into `vendor/` — a
   skeleton's database landing inside the package it was installed from, green in

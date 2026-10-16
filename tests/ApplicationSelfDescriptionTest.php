@@ -172,6 +172,28 @@ final class ApplicationSelfDescriptionTest extends TestCase
     }
 
     /**
+     * An attribute PHP accepted but cannot resolve is refused, not ignored.
+     *
+     * Found by writing `#[LoginPage($page)]` without the import. PHP records an
+     * attribute by *name*, resolving it only at `newInstance()`, so the
+     * unimported name became `Empira\Auth\Tests\LoginPage` — which does not
+     * exist — and `getAttributes(ModuleOption::class, IS_INSTANCEOF)` matched
+     * nothing without complaining. The application silently got the module's
+     * default page and no message about why.
+     *
+     * Every attribute on an application class comes from an installed package,
+     * so a missing one is always a missing import, a typo, or a dependency that
+     * is not installed.
+     */
+    public function testAnAttributeThatDoesNotExistIsRefusedRatherThanIgnored(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('which does not exist');
+
+        (new UnimportedOption())->install([RecordingModule::class]);
+    }
+
+    /**
      * A module resolved by name rather than constructed, so it can use the
      * session and entity manager the framework has already bound.
      */
@@ -375,5 +397,24 @@ final class GoodStorage implements ProvidesStorage
     public function path(): string
     {
         return 'storage/app.sqlite';
+    }
+}
+
+/** Declares an attribute in this file's own namespace, with no such class there. */
+#[Empira\Tests\NotImported('x')]
+final class UnimportedOption extends Exposed
+{
+}
+
+#\Attribute(\Attribute::TARGET_CLASS)]
+final class NeverDeclared implements ModuleOption
+{
+    public function __construct(private readonly string $value)
+    {
+    }
+
+    public function options(): array
+    {
+        return ['never' => $this->value];
     }
 }
