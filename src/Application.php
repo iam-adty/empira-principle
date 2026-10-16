@@ -391,7 +391,7 @@ class Application
             return $bound->array('db');
         }
 
-        return DatabaseConfig::fromEnvironment()->array();
+        return DatabaseConfig::fromEnvironment()->all();
     }
 
     /**

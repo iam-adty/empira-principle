@@ -67,6 +67,84 @@ final class OrmLifecycleTest extends TestCase
 
     // ------------------------------------------------------------- wiring
 
+    /**
+     * `orm()` with no configuration reads `DB_DATABASE` from the environment.
+     *
+     * It used to return `[]`, because nothing in the framework binds a `Config`
+     * to read — so `DatabaseConfig` supplied its defaults and the application
+     * silently opened `:memory:`. Every query answered and the connection
+     * worked, so the failure surfaced as a table that had been migrated into a
+     * real file not being there.
+     *
+     * Asserted through `empira migrate`'s own reader rather than by checking the
+     * connection parameters, because the property that matters is that the two
+     * agree: an application and its migrations talking about different files is
+     * the whole bug.
+     */
+    public function testOrmWithNoConfigurationReadsTheEnvironment(): void
+    {
+        $database = Temp::file('empira-orm-from-env-');
+
+        $previous = $_ENV['DB_DATABASE'] ?? null;
+        $_ENV['DB_DATABASE'] = $database;
+
+        try {
+            $app = new Application(self::SECRET, new NullState());
+            $app->orm();
+
+            $fromEnvironment = $app->entities()->getConnection()->getParams();
+
+            $migrate = \Empira\Config\DatabaseConfig::fromEnvironment()->all();
+        } finally {
+            if ($previous === null) {
+                unset($_ENV['DB_DATABASE']);
+            } else {
+                $_ENV['DB_DATABASE'] = $previous;
+            }
+
+            Temp::remove($database);
+        }
+
+        self::assertSame($database, $migrate['database']);
+        self::assertSame(
+            $migrate['database'],
+            $fromEnvironment['path'] ?? $fromEnvironment['database'] ?? null,
+            'orm() and empira migrate disagree about which database this is'
+        );
+    }
+
+    /**
+     * A `Config` with a `db` section still wins over the environment, which is
+     * the case the old code was reaching for when it looked for one.
+     */
+    public function testABoundConfigWithADatabaseSectionStillWins(): void
+    {
+        $database = Temp::file('empira-orm-bound-config-');
+
+        $previous = $_ENV['DB_DATABASE'] ?? null;
+        $_ENV['DB_DATABASE'] = '/from/the/environment.sqlite';
+
+        try {
+            $app = new Application(self::SECRET, new NullState());
+            $app->container()->instance(Config::class, new Config([
+                'db' => ['driver' => 'sqlite', 'database' => $database],
+            ]));
+            $app->orm();
+
+            $params = $app->entities()->getConnection()->getParams();
+        } finally {
+            if ($previous === null) {
+                unset($_ENV['DB_DATABASE']);
+            } else {
+                $_ENV['DB_DATABASE'] = $previous;
+            }
+
+            Temp::remove($database);
+        }
+
+        self::assertSame($database, $params['path'] ?? $params['database'] ?? null);
+    }
+
     public function testOrmMakesTheEntityManagerAutowirable(): void
     {
         $app = new Application(self::SECRET, new NullState());
