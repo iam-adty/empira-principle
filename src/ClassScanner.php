@@ -34,7 +34,12 @@ namespace Empira;
 final class ClassScanner
 {
     /**
-     * Every autoloadable class under `$directory`, as `$namespace` describes it.
+     * Every autoloadable type under `$directory`, as `$namespace` describes it.
+     *
+     * Interfaces included, because they are autoloadable and callers filter
+     * what they receive — a scanner that dropped them would make an interface
+     * look like a PSR-4 mistake and log about a file that was exactly where it
+     * belonged.
      *
      * @return list<class-string>
      */
@@ -60,7 +65,7 @@ final class ClassScanner
             $relative = substr($file->getPathname(), strlen(rtrim($directory, '/')) + 1);
             $class = $prefix . str_replace(['/', '.php'], ['\\', ''], $relative);
 
-            if (!class_exists($class)) {
+            if (!class_exists($class) && !interface_exists($class)) {
                 // PSR-4 mismatch: the autoloader cannot find what the path implies.
                 error_log(sprintf('empira: no autoloadable class %s at %s', $class, $file->getPathname()));
 
