@@ -215,7 +215,7 @@ final class TestClientTest extends TestCase
     public function testTheUnderlyingResponseIsAvailable(): void
     {
         $app = $this->app();
-        $app->routes()->get('/x', fn(): Response => Response::html('ok')->setStatus(201));
+        $app->routes()->get('/x', fn(): Response => Response::html('ok', 201));
 
         $response = (new TestClient($app))->get('/x')->request();
 

@@ -14,6 +14,9 @@ use Empira\Routing\HttpException;
 use Empira\Routing\RouteCollection;
 use Empira\Routing\UrlGenerator;
 use Empira\State\NullState;
+use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -315,9 +318,9 @@ final class RoutingTest extends TestCase
         $app = $this->app();
         $app->routes()->get('/m', fn(): string => 'never');
         $app->use(new class () implements Middleware {
-            public function handle(Request $request, \Closure $next): Response
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
             {
-                return Response::html('blocked')->setStatus(401);
+                return Response::html('blocked', 401);
             }
         });
 
@@ -332,9 +335,9 @@ final class RoutingTest extends TestCase
         $app = $this->app();
         $app->routes()->get('/m', fn(): Response => Response::html('body'));
         $app->use(new class () implements Middleware {
-            public function handle(Request $request, \Closure $next): Response
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
             {
-                return $next($request)->withHeader('X-Middleware', 'yes');
+                return $handler->handle($request)->withHeader('X-Middleware', 'yes');
             }
         });
 
@@ -349,9 +352,9 @@ final class RoutingTest extends TestCase
         $app->routes()->group('/open', fn(RouteCollection $r) => $r->get('', fn(): string => 'open'));
         $app->routes()->group('/closed', fn(RouteCollection $r) => $r->get('', fn(): string => 'closed'), middleware: [
             new class () implements Middleware {
-                public function handle(Request $request, \Closure $next): Response
+                public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
                 {
-                    return Response::html('denied')->setStatus(403);
+                    return Response::html('denied', 403);
                 }
             },
         ]);
@@ -466,11 +469,11 @@ final class RecordingMiddleware implements Middleware
     ) {
     }
 
-    public function handle(Request $request, \Closure $next): Response
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         $this->log[] = $this->label . ':in';
 
-        $response = $next($request);
+        $response = $handler->handle($request);
 
         $this->log[] = $this->label . ':out';
 

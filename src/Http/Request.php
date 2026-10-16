@@ -4,13 +4,58 @@ declare(strict_types=1);
 
 namespace Empira\Http;
 
+use Empira\Html;
+use Nyholm\Psr7\Stream;
+use Nyholm\Psr7\UploadedFile;
+use Nyholm\Psr7\Uri;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UploadedFileInterface;
+use Psr\Http\Message\UriInterface;
+
 /**
  * An inbound HTTP request with the htmx request headers surfaced.
+ *
+ * This is a PSR-7 `ServerRequestInterface`, so any PSR-7 or PSR-15 consumer can
+ * be handed one directly. The htmx conveniences below are additions: PSR-7 knows
+ * nothing about `HX-Request`, and that is the point of this package rather than
+ * of the standard.
+ *
+ * ## The constructor properties are no longer `readonly`
+ *
+ * They were. PSR-7 requires `withMethod()`, `withUri()`, `withQueryParams()` and
+ * the rest to return a **modified copy**, and PHP will not let a `readonly`
+ * property be assigned on a clone — there is no `clone with`. So the language
+ * no longer enforces the immutability here; the `with*` methods do, by cloning
+ * rather than assigning.
+ *
+ * That is a real loss and it is stated here rather than buried: anything holding
+ * a request can now assign `$request->method`. The alternative was rebuilding
+ * each `with*` by re-running the nine-argument constructor, which puts the
+ * maintenance burden of "a new field was added" on fifteen methods instead of
+ * one. The clone is the smaller ongoing risk.
  */
-final class Request
+final class Request implements ServerRequestInterface
 {
     /** @var array<string, string> lower-cased header name => value */
     private array $headers;
+
+    /** @var array<string, mixed> PSR-7 request attributes */
+    private array $attributes = [];
+
+    /** @var UploadedFileInterface[]|null built on first ask, never before */
+    private ?array $uploadedFiles = null;
+
+    private ?UriInterface $uriObject = null;
+
+    private ?StreamInterface $bodyStream = null;
+
+    private string $protocolVersion = '1.1';
+
+    private ?string $requestTarget = null;
+
+    /** @var array<string, mixed> */
+    private array $serverParams;
 
     /**
      * @param array<string, string> $headers
@@ -18,17 +63,19 @@ final class Request
      * @param array<string, mixed>  $body
      * @param array<string, string> $cookies
      * @param array<string, mixed>  $files
+     * @param array<string, mixed>  $serverParams
      */
     public function __construct(
-        public readonly string $method,
-        public readonly string $uri,
-        public readonly array $query = [],
-        public readonly array $body = [],
+        public string $method,
+        public string $uri,
+        public array $query = [],
+        public array $body = [],
         array $headers = [],
-        public readonly array $cookies = [],
-        public readonly array $files = [],
-        public readonly ?string $remoteAddress = null,
-        public readonly bool $trustProxy = false,
+        public array $cookies = [],
+        public array $files = [],
+        public ?string $remoteAddress = null,
+        public bool $trustProxy = false,
+        array $serverParams = [],
     ) {
         $normalised = [];
 
@@ -37,6 +84,7 @@ final class Request
         }
 
         $this->headers = $normalised;
+        $this->serverParams = $serverParams;
     }
 
     /**
@@ -83,6 +131,341 @@ public static function capture(bool $trustProxy = false): self
             remoteAddress: isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : null,
             trustProxy: $trustProxy,
         );
+    }
+
+    // ------------------------------------------------------------------- PSR-7
+
+    /**
+     * Narrow a PSR request back to this framework's own.
+     *
+     * PSR-15 types `process()`'s parameter as `ServerRequestInterface`, and PHP
+     * forbids narrowing a parameter — so the htmx conveniences (`isHtmx()`,
+     * `input()`, `accepts()`) are out of scope inside a middleware. This gets
+     * them back, in one line, for the layers that want them.
+     *
+     *     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+     *     {
+     *         $empira = Request::of($request);
+     *
+     *         return $empira->isHtmx() ? $handler->handle($request) : Response::html('…');
+     *     }
+     *
+     * It **throws** rather than returning null. A middleware that quietly
+     * degraded to the interface's methods would still work for everything except
+     * the htmx case — which is exactly the case nobody would notice until a swap
+     * stopped being one.
+     */
+    public static function of(ServerRequestInterface $request): self
+    {
+        if (!$request instanceof self) {
+            throw new \InvalidArgumentException(sprintf(
+                'Expected %s, got %s.',
+                self::class,
+                $request::class,
+            ));
+        }
+
+        return $request;
+    }
+
+    public function getRequestTarget(): string
+    {
+        // PSR asks for the target in origin-form — path plus query — and a
+        // request built from an absolute URL still has one. Falling back to the
+        // path alone is what an origin-form request would return anyway.
+        if ($this->requestTarget !== null) {
+            return $this->requestTarget;
+        }
+
+        $query = $this->getUri()->getQuery();
+
+        return $this->path() . ($query === '' ? '' : '?' . $query);
+    }
+
+    public function withRequestTarget(string $requestTarget): static
+    {
+        $new = clone $this;
+        $new->requestTarget = $requestTarget;
+
+        return $new;
+    }
+
+    public function getMethod(): string
+    {
+        return strtoupper($this->method);
+    }
+
+    public function withMethod(string $method): static
+    {
+        $new = clone $this;
+        $new->method = strtoupper($method);
+
+        return $new;
+    }
+
+    public function getUri(): UriInterface
+    {
+        // A bare path is a valid relative URI and PSR has no problem with one,
+        // but `fullUrl()` is what this framework has always handed callers, and a
+        // scheme of `http` with a host is what a consumer building an outgoing
+        // request needs.
+        return $this->uriObject ??= new Uri($this->fullUrl());
+    }
+
+    public function withUri(UriInterface $uri, bool $preserveHost = false): static
+    {
+        $new = clone $this;
+        $new->uri = (string) $uri;
+        $new->uriObject = $preserveHost ? $uri : null;
+
+        return $new;
+    }
+
+    public function getProtocolVersion(): string
+    {
+        return $this->protocolVersion;
+    }
+
+    public function withProtocolVersion(string $version): static
+    {
+        $new = clone $this;
+        $new->protocolVersion = $version;
+
+        return $new;
+    }
+
+    /**
+     * @return array<string, string[]>
+     */
+    public function getHeaders(): array
+    {
+        $headers = [];
+
+        foreach ($this->headers as $name => $value) {
+            $headers[$name] = [$value];
+        }
+
+        return $headers;
+    }
+
+    public function hasHeader(string $name): bool
+    {
+        return isset($this->headers[strtolower($name)]);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getHeader(string $name): array
+    {
+        $value = $this->headers[strtolower($name)] ?? null;
+
+        return $value === null ? [] : [$value];
+    }
+
+    public function getHeaderLine(string $name): string
+    {
+        return (string) ($this->headers[strtolower($name)] ?? '');
+    }
+
+    public function withHeader(string $name, $value): static
+    {
+        $new = clone $this;
+        $new->headers[strtolower($name)] = (string) $value;
+
+        return $new;
+    }
+
+    public function withAddedHeader(string $name, $value): static
+    {
+        $new = clone $this;
+
+        // A request header carries one value here; the existing one is replaced
+        // rather than appended, because a comma-joined duplicate is not what any
+        // of the headers this framework reads expects to find.
+        $new->headers[strtolower($name)] = (string) $value;
+
+        return $new;
+    }
+
+    public function withoutHeader(string $name): static
+    {
+        $new = clone $this;
+        unset($new->headers[strtolower($name)]);
+
+        return $new;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getServerParams(): array
+    {
+        return $this->serverParams;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getCookieParams(): array
+    {
+        return $this->cookies;
+    }
+
+    public function withCookieParams(array $cookies): static
+    {
+        $new = clone $this;
+        $new->cookies = $cookies;
+
+        return $new;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getQueryParams(): array
+    {
+        return $this->query;
+    }
+
+    public function withQueryParams(array $query): static
+    {
+        $new = clone $this;
+        $new->query = $query;
+
+        return $new;
+    }
+
+    /**
+     * Uploads as PSR objects, built from the `$_FILES`-shaped array on first ask.
+     *
+     * Both shapes exist and this is the boundary between them: {@see files()}
+     * hands back what PHP produced, unchanged, and this is what a PSR consumer
+     * gets. Building them lazily matters — constructing an `UploadedFile` opens
+     * a stream, and a request with fifty uploads should not open fifty handles
+     * for a consumer that never looks.
+     *
+     * @return array<string, UploadedFileInterface|array>
+     */
+    public function getUploadedFiles(): array
+    {
+        if ($this->uploadedFiles !== null) {
+            return $this->uploadedFiles;
+        }
+
+        $files = [];
+
+        foreach ($this->files as $key => $file) {
+            $files[$key] = is_array($file) && isset($file['tmp_name'])
+                ? new UploadedFile(
+                    // Argument order is (stream, size, error, filename, type).
+                    (string) $file['tmp_name'],
+                    isset($file['size']) ? (int) $file['size'] : null,
+                    isset($file['error']) ? (int) $file['error'] : UPLOAD_ERR_OK,
+                    isset($file['name']) ? (string) $file['name'] : null,
+                    isset($file['type']) ? (string) $file['type'] : null,
+                )
+                : $file;
+        }
+
+        return $this->uploadedFiles = $files;
+    }
+
+    public function withUploadedFiles(array $uploadedFiles): static
+    {
+        $new = clone $this;
+        $new->files = $uploadedFiles;
+        $new->uploadedFiles = null;
+
+        return $new;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getParsedBody(): array
+    {
+        return $this->body;
+    }
+
+    public function withParsedBody($data): static
+    {
+        $new = clone $this;
+        $new->body = is_array($data) ? $data : [];
+
+        return $new;
+    }
+
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function getAttribute(string $name, $default = null): mixed
+    {
+        return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
+    }
+
+    public function withAttribute(string $name, $value): static
+    {
+        $new = clone $this;
+        $new->attributes[$name] = $value;
+
+        return $new;
+    }
+
+    public function withoutAttribute(string $name): static
+    {
+        $new = clone $this;
+        unset($new->attributes[$name]);
+
+        return $new;
+    }
+
+    /**
+     * The raw request body as a stream.
+     *
+     * Emptied for a request whose body was already parsed into {@see $body} by
+     * {@see capture()}, because a framework that read `php://input` first has
+     * consumed the stream and there is nothing left to hand back. A request
+     * built with a body but no parsed array gets its JSON back.
+     */
+    public function getBody(): StreamInterface
+    {
+        return $this->bodyStream ?? Stream::create($this->rawBody());
+    }
+
+    /**
+     * PSR requires this on every message, request included.
+     *
+     * The parsed array is left alone rather than cleared: a caller replacing the
+     * raw body is setting what arrived on the wire, and {@see getParsedBody()} is
+     * what the application reads. Throwing the parsed form away would mean one
+     * PSR call silently broke every `input()` in the request.
+     */
+    public function withBody(StreamInterface $body): static
+    {
+        $new = clone $this;
+        $new->bodyStream = $body;
+
+        return $new;
+    }
+
+    /**
+     * The raw body as PSR requires it.
+     *
+     * PSR separates the raw stream from the parsed body, and capture() can only
+     * have one of them: reading `php://input` is what parses the JSON, and the
+     * stream is gone afterwards. Where both exist the parsed array is the
+     * useful one, so it is re-encoded rather than handed back empty.
+     */
+    private function rawBody(): string
+    {
+        if ($this->body !== []) {
+            return Html::json($this->body);
+        }
+
+        return $this->serverParams['raw_body'] ?? '';
     }
 
     public function path(): string

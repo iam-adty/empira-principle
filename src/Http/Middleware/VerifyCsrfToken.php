@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Empira\Http\Middleware;
 
-use Closure;
 use Empira\Security\RequestUser;
 use Empira\Http\Format;
 use Empira\Http\Middleware;
 use Empira\Http\Request;
 use Empira\Http\Response;
-use Empira\Html;
 use Empira\Routing\RouteCollection;
 use Empira\Security\Csrf;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 
 /**
  * Verifies the CSRF token on state-changing route requests.
@@ -66,18 +67,23 @@ final class VerifyCsrfToken implements Middleware
     ) {
     }
 
-    public function handle(Request $request, Closure $next): Response
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if (in_array(strtoupper($request->method), self::SAFE, true)) {
-            return $next($request);
+        // Narrowed once, here, rather than at every use. The parameter is typed
+        // as PSR requires — PHP will not let it be narrower — and this middleware
+        // wants `method`, `csrfToken()` and `path()`, all of which are Empira's.
+        $empira = Request::of($request);
+
+        if (in_array(strtoupper($empira->method), self::SAFE, true)) {
+            return $handler->handle($empira);
         }
 
-        if ($this->csrf->isValid($request->csrfToken())) {
-            return $next($request);
+        if ($this->csrf->isValid($empira->csrfToken())) {
+            return $handler->handle($empira);
         }
 
-        if ($this->routeOptsOut($request) || $this->authenticatedByNonAmbientCredential($request)) {
-            return $next($request);
+        if ($this->routeOptsOut($empira) || $this->authenticatedByNonAmbientCredential($empira)) {
+            return $handler->handle($empira);
         }
 
         return $this->refuse();
@@ -117,10 +123,7 @@ final class VerifyCsrfToken implements Middleware
         $message = 'CSRF token mismatch.';
 
         if ($this->format === Format::Json) {
-            return (new Response())
-                ->withHeader('Content-Type', 'application/json')
-                ->setStatus(419)
-                ->setBody(Html::json(['error' => ['status' => 419, 'message' => $message]]));
+            return Response::json(['error' => ['status' => 419, 'message' => $message]], 419);
         }
 
         return Response::html($message, 419);

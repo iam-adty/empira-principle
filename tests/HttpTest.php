@@ -269,7 +269,7 @@ final class HttpTest extends TestCase
 
     public function testBodyAndStatus(): void
     {
-        $response = Response::html('<p>hi</p>')->setStatus(201);
+        $response = Response::html('<p>hi</p>', 201);
 
         $this->assertSame('<p>hi</p>', $response->body());
         $this->assertSame(201, $response->status());

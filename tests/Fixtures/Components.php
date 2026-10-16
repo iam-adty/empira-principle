@@ -155,9 +155,11 @@ final class ChattyFixture extends Component
 
     public function save(): void
     {
-        $this->response()
+        // The result is kept, because the response is immutable:
+        // `pushUrl()` returns a modified copy and dropping it queues nothing.
+        $this->updateResponse($this->response()
             ->pushUrl('/saved')
-            ->triggerAfterSwap('saved', ['id' => 42]);
+            ->triggerAfterSwap('saved', ['id' => 42]));
     }
 
     protected function render(): Element

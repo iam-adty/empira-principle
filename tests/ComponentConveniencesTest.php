@@ -160,7 +160,7 @@ final class GuestbookFixture extends Component
         $this->entries[] = $this->request()->string('name');
         $this->flash('notice', 'Signed.');
 
-        $this->response()->pushUrl('/guestbook');
+        $this->updateResponse($this->response()->pushUrl('/guestbook'));
     }
 
     protected function render(): Element

@@ -16,6 +16,9 @@ use Empira\Http\Session;
 use Empira\State\NullState;
 use Empira\View\Layout;
 use Empira\View\Region;
+use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -363,11 +366,11 @@ final class NoteMiddleware implements Middleware
     {
     }
 
-    public function handle(Request $request, Closure $next): Response
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         self::$ids[] = spl_object_id($this);
         self::$formats[] = $this->format;
 
-        return $next($request);
+        return $handler->handle($request);
     }
 }

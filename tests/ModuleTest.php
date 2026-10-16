@@ -12,6 +12,9 @@ use Empira\Module;
 use Empira\Security\Guard;
 use Empira\Security\Identity;
 use Empira\Security\RequestUser;
+use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -127,7 +130,7 @@ final class ModuleTest extends TestCase
             public function register(Application $app): void
             {
                 $app->use(new class implements Middleware {
-                    public function handle(Request $request, \Closure $next): Response
+                    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
                     {
                         return Response::html('intercepted');
                     }

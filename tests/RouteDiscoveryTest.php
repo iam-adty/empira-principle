@@ -13,6 +13,9 @@ use Empira\Routing\RouteParams;
 use Empira\State\NullState;
 use Empira\View\Layout;
 use Empira\View\Region;
+use Psr\Http\Server\RequestHandlerInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -419,14 +422,15 @@ final class RouteDiscoveryTest extends TestCase
     public function testMiddlewareOnAnAttributeRuns(): void
     {
         $this->write('Blocker.php', 'Empira\\Fixtures\\Blocker', <<<'PHP'
-            use Closure;
             use Empira\Http\Middleware;
-            use Empira\Http\Request;
             use Empira\Http\Response;
+            use Psr\Http\Message\ResponseInterface;
+            use Psr\Http\Message\ServerRequestInterface;
+            use Psr\Http\Server\RequestHandlerInterface;
 
             final class Blocker implements Middleware
             {
-                public function handle(Request $request, Closure $next): Response
+                public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
                 {
                     return Response::html('blocked', 403);
                 }

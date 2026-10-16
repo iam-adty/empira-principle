@@ -14,6 +14,9 @@ use Empira\Http\Format;
 use Empira\Http\Middleware;
 use Empira\Http\Pipeline;
 use Empira\Http\Request;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
 use Empira\Http\Response;
 use Empira\Http\Session;
 use Empira\Routing\HttpException;
@@ -541,8 +544,18 @@ final class Application
      * Component action traffic is matched first, because those URLs live under
      * a reserved prefix; then named routes, then the fallback.
      */
-    public function handle(Request $request): Response
+    /**
+     * Answer one request.
+     *
+     * Typed as PSR-7's `ServerRequestInterface` rather than this package's
+     * {@see Request}, so a PSR-15 consumer can drive an Empira application
+     * directly and get one of these back. The concrete types still work — they
+     * implement the interface — and everything downstream narrows with
+     * {@see Request::of()} if it needs the htmx conveniences.
+     */
+    public function handle(ServerRequestInterface $request): ResponseInterface
     {
+        $request = Request::of($request);
         // An Application outlives the request in a long-running worker, and the
         // session is the one piece of state where that outlives *wrongly* — see
         // Session::beginRequest(), which is why the reason lives there.
@@ -655,7 +668,7 @@ final class Application
         $response = new Response();
 
         foreach ($headers as $name => $value) {
-            $response->withHeader($name, (string) $value);
+            $response = $response->withHeader($name, (string) $value);
         }
 
         if ($this->format() === Format::Json) {
@@ -667,11 +680,10 @@ final class Application
 
             return $response
                 ->withHeader('Content-Type', 'application/json')
-                ->setStatus($status)
-                ->setBody(Html::json(['error' => $error]));
+                ->withStatus($status)->withHtml(Html::json(['error' => $error]));
         }
 
-        return $response->setStatus($status)->setBody($message);
+        return $response->withStatus($status)->withHtml($message);
     }
 
     /**
@@ -761,7 +773,7 @@ final class Application
             default => (string) $result,
         };
 
-        return $response->setStatus(200)->setBody($body);
+        return $response->withStatus(200)->withHtml($body);
     }
 
     /**
@@ -800,8 +812,7 @@ final class Application
         $body = $markup->render();
 
         return ($this->context?->response ?? new Response())
-            ->setStatus(200)
-            ->setBody($body instanceof Element ? $body->render() : $body->get());
+            ->withStatus(200)->withHtml($body instanceof Element ? $body->render() : $body->get());
     }
 
     /**
@@ -843,9 +854,9 @@ final class Application
      * with a page, and an `Auth` built for request one decides who request two
      * is. Reachable, but only if you hand the pipeline an object.
      *
-     * @param class-string<Middleware>|Middleware ...$layers
+     * @param class-string<MiddlewareInterface>|MiddlewareInterface ...$layers
      */
-    public function use(string|Middleware ...$layers): self
+    public function use(string|MiddlewareInterface ...$layers): self
     {
         $this->pipeline->push(...$layers);
 
@@ -1029,12 +1040,11 @@ final class Application
             // `Retry-After` — both of which are part of the protocol rather than
             // decoration on it.
             foreach ($headers as $name => $value) {
-                $response->withHeader($name, $value);
+                $response = $response->withHeader($name, $value);
             }
 
             return $response
-                ->setStatus($status)
-                ->setBody($body instanceof Element ? $body->render() : (string) $body);
+                ->withStatus($status)->withHtml($body instanceof Element ? $body->render() : (string) $body);
         }
 
         return $this->errorResponse($status, $e->getMessage(), $headers, $errors);

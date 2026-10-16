@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Empira\Container;
 
+use Psr\Container\ContainerInterface;
 use ReflectionFunction;
 use ReflectionIntersectionType;
 use ReflectionMethod;
@@ -28,8 +29,21 @@ use ReflectionUnionType;
  *
  * The container is deliberately synchronous and unaware of HTTP: it is a
  * wiring tool, not a service locator the application reaches into everywhere.
+ *
+ * ## PSR-11
+ *
+ * It is a `Psr\Container\ContainerInterface`, so anything written against the
+ * standard can take one of these without an adapter. `get()` narrows the
+ * interface's `mixed` to `object`, which PHP permits and which is the honest
+ * answer here: this container builds things, it does not answer questions with
+ * scalars.
+ *
+ * The exceptions split the way PSR-11 splits them. `has()` is what a consumer
+ * asks before `get()`, so "nothing is bound" is {@see NotFound} and everything
+ * else is {@see ContainerException} — and `NotFound` extends the other, so a
+ * consumer that catches only the broad one keeps working.
  */
-final class Container
+final class Container implements ContainerInterface
 {
     /** @var array<string, array{concrete: callable|string|null, shared: bool}> */
     private array $bindings = [];
@@ -104,7 +118,8 @@ final class Container
     /**
      * Resolve a name to an object.
      *
-     * @throws ContainerException
+     * @throws NotFound         nothing is bound under that name
+     * @throws ContainerException a binding exists but could not be built
      */
     public function get(string $abstract): object
     {
@@ -124,6 +139,7 @@ final class Container
     /**
      * Resolve a name, allowing a factory to return any value.
      *
+     * @throws NotFound
      * @throws ContainerException
      */
     public function make(string $abstract): mixed
@@ -210,7 +226,7 @@ final class Container
     private function build(string $class, string $requestedBy): object
     {
         if (!class_exists($class)) {
-            throw new ContainerException(interface_exists($class)
+            throw new NotFound(interface_exists($class)
                 ? sprintf('Cannot resolve "%s" requested by "%s": bind the interface to a concrete class.', $class, $requestedBy)
                 : sprintf('Cannot resolve "%s" requested by "%s": no such class.', $class, $requestedBy));
         }
@@ -218,7 +234,7 @@ final class Container
         $reflection = new \ReflectionClass($class);
 
         if (!$reflection->isInstantiable()) {
-            throw new ContainerException(sprintf(
+            throw new NotFound(sprintf(
                 'Cannot resolve "%s" requested by "%s": the class is abstract or an interface.',
                 $class,
                 $requestedBy

@@ -51,7 +51,7 @@ abstract class Controller
 
     protected function redirect(string $url, int $status = 302): Response
     {
-        return (new Response())->setStatus($status)->withHeader('Location', $url);
+        return (new Response())->withStatus($status)->withHeader('Location', $url);
     }
 
     protected function json(mixed $data, int $status = 200): Response

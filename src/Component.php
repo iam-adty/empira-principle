@@ -73,7 +73,6 @@ abstract class Component
     protected array $props = [];
 
     protected Request $request;
-    protected Response $response;
     protected ElementFactory $hx;
 
     private string $nonce;
@@ -115,7 +114,6 @@ abstract class Component
         $this->nonce = $nonce ?? bin2hex(random_bytes(8));
         $this->targetId = $this->id();
         $this->request = $context->request;
-        $this->response = $context->response;
 
         // Every element built by this component can resolve `->action('name')`
         // into a signed endpoint. The default target is a closure because a
@@ -563,7 +561,13 @@ protected function swapsIndependently(): bool
         // Only announce a failure: an event on every successful action would be
         // noise, and a client that listens for it would have to filter anyway.
         if ($errors->any()) {
-            $this->response()->triggerAfterSwap($this->eventName('invalid'), $errors->jsonSerialize());
+            // The result has to be kept: `triggerAfterSwap()` returns a modified
+            // copy, and a component that called it and dropped the result queued
+            // nothing at all.
+            $this->updateResponse($this->response()->triggerAfterSwap(
+                $this->eventName('invalid'),
+                $errors->jsonSerialize(),
+            ));
         }
 
         return $errors;
@@ -744,7 +748,27 @@ protected function swapsIndependently(): bool
 
     protected function response(): Response
     {
-        return $this->response;
+        return $this->context->response;
+    }
+
+    /**
+     * Keep the result of an immutable change to the response.
+     *
+     * `Response` is immutable, so `pushUrl()`, `triggerAfterSwap()` and the rest
+     * return a **modified copy** and leave the one they were called on alone.
+     * An action that queues a header therefore has to put the copy back, or the
+     * header is silently dropped:
+     *
+     *     $this->updateResponse($this->response()->pushUrl('/posts/1'));
+     *
+     * It goes on the context rather than on the component, because the router
+     * returns `$context->response` and a second copy held here would be a second
+     * answer to the same question — and the two would disagree the moment a
+     * component and its context disagreed about a header.
+     */
+    protected function updateResponse(Response $response): Response
+    {
+        return $this->context->response = $response;
     }
 
     /**

@@ -82,8 +82,7 @@ final class Router
         $component->afterAction($action);
 
         return $context->response
-            ->setStatus(200)
-            ->setBody($component->toHtml());
+            ->withStatus(200)->withHtml($component->toHtml());
     }
 
     /**

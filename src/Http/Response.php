@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Empira\Http;
 
 use Empira\Html;
+use Nyholm\Psr7\Stream;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * An outbound HTTP response with fluent `HX-*` header helpers.
@@ -14,15 +17,40 @@ use Empira\Html;
  * on once a swap completes.
  *
  *     return response()->pushUrl('/posts/1')
-                     ->retarget('#flash')
-                     ->triggerAfterSwap('saved');
+ *                      ->retarget('#flash')
+ *                      ->triggerAfterSwap('saved');
  *
  * Trigger headers accumulate and are merged into a single JSON header when
  * sent, which is what htmx expects.
+ *
+ * ## Immutable, as PSR-7 requires
+ *
+ * Every `with*()` returns a **new** response and leaves the one you called it
+ * on untouched. That was not always true here: `withHeader()` used to mutate in
+ * place under a PSR-shaped name, which is the one thing PSR-7 forbids and the
+ * one thing a shared response in a middleware stack cannot survive.
+ *
+ * The cost is that a discarded return value now does nothing:
+ *
+ *     $response->withHeader('X-A', 'b');          // no effect
+ *     $response = $response->withHeader('X-A', 'b');   // what you meant
+ *
+ * There is no mutating counterpart to fall back on. `setBody()` and
+ * `setStatus()` are gone rather than kept as aliases, because one immutable way
+ * and one mutable way is how a codebase ends up with responses that half the
+ * pipeline believes are shared.
+ *
+ * ## Two header shapes, deliberately
+ *
+ * `getHeaders()` is PSR's `array<string, string[]>`, because a header may
+ * legitimately repeat. `headers()` is this package's `array<string, string>`,
+ * because that is what the emitter and htmx want. They are not
+ * interchangeable, and `headers()` is derived from `getHeaders()` rather than
+ * kept separately, so they cannot drift.
  */
-final class Response
+final class Response implements ResponseInterface
 {
-    /** @var array<string, string[]> */
+    /** @var array<string, string[]> header name => values, as written */
     private array $headers = [];
 
     /** @var array<string, array<string, mixed>> queued HX-Trigger payloads */
@@ -32,11 +60,18 @@ final class Response
     private ?string $file = null;
 
     private array $triggerAfterSwap = [];
+
     private array $triggerAfterSettle = [];
+
+    /** Memoised PSR stream, so repeated `getBody()` does not reopen the file. */
+    private ?StreamInterface $stream = null;
+
+    private string $protocolVersion = '1.1';
 
     public function __construct(
         private string $body = '',
         private int $status = 200,
+        private string $reasonPhrase = '',
     ) {
     }
 
@@ -49,7 +84,7 @@ final class Response
      */
     public static function html(string $html, int $status = 200): self
     {
-        return (new self('', $status))->setBody($html);
+        return (new self())->withStatus($status)->withHtml($html);
     }
 
     /**
@@ -65,9 +100,7 @@ final class Response
 
     public static function json(mixed $data, int $status = 200): self
     {
-        return (new self('', $status))
-            ->withHeader('Content-Type', 'application/json')
-            ->setBody(Html::json($data));
+        return (new self())->withStatus($status)->withJson($data);
     }
 
     public static function noContent(int $status = 204): self
@@ -81,16 +114,178 @@ final class Response
         return new self('', 286);
     }
 
-    public function body(): string
+    // ------------------------------------------------------------------- PSR-7
+
+    public function getStatusCode(): int
     {
-        return $this->body;
+        return $this->status;
     }
 
-    public function setBody(string $body): self
+    public function withStatus(int $code, string $reasonPhrase = ''): static
     {
-        $this->body = $body;
+        $new = clone $this;
+        $new->status = $code;
+        $new->reasonPhrase = $reasonPhrase;
+        $new->stream = null;
 
-        return $this;
+        return $new;
+    }
+
+    public function getReasonPhrase(): string
+    {
+        return $this->reasonPhrase;
+    }
+
+    /**
+     * @return array<string, string[]>
+     */
+    public function getHeaders(): array
+    {
+        $headers = $this->headers;
+
+        foreach (['Trigger' => $this->triggers, 'Trigger-After-Swap' => $this->triggerAfterSwap, 'Trigger-After-Settle' => $this->triggerAfterSettle] as $suffix => $events) {
+            if ($events !== []) {
+                $headers['HX-' . $suffix] = [Html::json($events)];
+            }
+        }
+
+        return $headers;
+    }
+
+    public function hasHeader(string $name): bool
+    {
+        foreach (array_keys($this->getHeaders()) as $header) {
+            if (strcasecmp($header, $name) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getHeader(string $name): array
+    {
+        foreach ($this->getHeaders() as $header => $values) {
+            if (strcasecmp($header, $name) === 0) {
+                return $values;
+            }
+        }
+
+        return [];
+    }
+
+    public function getHeaderLine(string $name): string
+    {
+        return implode(', ', $this->getHeader($name));
+    }
+
+    public function withHeader(string $name, $value): static
+    {
+        $new = clone $this;
+        $new->headers = $this->headersWithout($name);
+        $new->headers[$name] = self::normaliseHeaderValue($value);
+
+        return $new;
+    }
+
+    /**
+     * @param string|string[] $value
+     */
+    public function withAddedHeader(string $name, $value): static
+    {
+        $new = clone $this;
+        $existing = $new->getHeader($name);
+
+        $new->headers = $this->headersWithout($name);
+        $new->headers[$name] = [...$existing, ...self::normaliseHeaderValue($value)];
+
+        return $new;
+    }
+
+    public function withoutHeader(string $name): static
+    {
+        $new = clone $this;
+        $new->headers = $this->headersWithout($name);
+
+        return $new;
+    }
+
+    public function getBody(): StreamInterface
+    {
+        if ($this->stream !== null) {
+            return $this->stream;
+        }
+
+        // A streamed file answers with itself. It is opened here rather than in
+        // `stream()` so that setting up a download costs nothing until something
+        // actually reads it — which `emit()` deliberately does not, because it
+        // reads `$this->file` in chunks.
+        return $this->stream = $this->file !== null
+            ? Stream::create(fopen($this->file, 'rb') ?: '')
+            : Stream::create($this->body);
+    }
+
+    public function withBody(StreamInterface $body): static
+    {
+        $new = clone $this;
+        $new->stream = $body;
+        $new->file = null;
+        $new->body = '';
+
+        return $new;
+    }
+
+    /**
+     * Set a string body.
+     *
+     * Sugar for `withBody(Stream::create($html))`, which is what PSR-7 requires
+     * and what {@see withBody()} does. It exists because the alternative reads as
+     * `withBody(Stream::create($html))` at every call site in a framework whose
+     * bodies are strings — and a stream import leaking into twenty call sites
+     * makes the one place that genuinely deals in streams harder to see.
+     */
+    public function withHtml(string $html): static
+    {
+        return $this->withBody(Stream::create($html));
+    }
+
+    /**
+     * Encode `$data` as JSON and set it, with the content type to match.
+     */
+    public function withJson(mixed $data): static
+    {
+        return $this->withHeader('Content-Type', 'application/json')
+            ->withBody(Stream::create(Html::json($data)));
+    }
+
+    public function getProtocolVersion(): string
+    {
+        return $this->protocolVersion;
+    }
+
+    public function withProtocolVersion(string $version): static
+    {
+        $new = clone $this;
+        $new->protocolVersion = $version;
+
+        return $new;
+    }
+
+    // ------------------------------------------------------------ empira's own
+
+    /**
+     * The body as a string, for this package's own convenience.
+     *
+     * Empty for a streamed response, whose body is a file rather than a string
+     * in memory — {@see getBody()} is the method that answers either, and
+     * `emit()` is what a front controller should be calling anyway.
+     */
+    public function body(): string
+    {
+        return $this->file === null ? (string) $this->getBody() : '';
     }
 
     public function status(): int
@@ -98,30 +293,42 @@ final class Response
         return $this->status;
     }
 
-    public function setStatus(int $status): self
-    {
-        $this->status = $status;
-
-        return $this;
-    }
-
-    public function withHeader(string $name, string $value): self
-    {
-        $this->headers[$name] = [self::sanitiseHeaderValue($value)];
-
-        return $this;
-    }
-
     /**
      * Strip CR, LF and NUL so a value can never smuggle an extra header.
      */
-    private static function sanitiseHeaderValue(string $value): string
+    private static function normaliseHeaderValue(string|array $value): array
     {
-        return trim((string) preg_replace('/[\r\n\0]+/', '', $value));
+        return array_map(
+            static fn (string $item): string => trim((string) preg_replace('/[\r\n\0]+/', '', $item)),
+            is_array($value) ? array_values($value) : [$value],
+        );
     }
 
     /**
-     * All headers, with queued `HX-Trigger*` headers merged into JSON.
+     * Every stored header except `$name`, compared case-insensitively.
+     *
+     * Header names are case-insensitive in HTTP but case-preserving in practice,
+     * so `Content-Type` and `content-type` are one header. Setting one must not
+     * leave the other behind, which is what a plain `unset($headers[$name])`
+     * would do.
+     *
+     * @return array<string, string[]>
+     */
+    private function headersWithout(string $name): array
+    {
+        $kept = [];
+
+        foreach ($this->headers as $header => $values) {
+            if (strcasecmp($header, $name) !== 0) {
+                $kept[$header] = $values;
+            }
+        }
+
+        return $kept;
+    }
+
+    /**
+     * All headers as flat strings, for the emitter and for htmx.
      *
      * @return array<string, string>
      */
@@ -129,14 +336,8 @@ final class Response
     {
         $headers = [];
 
-        foreach ($this->headers as $name => $values) {
+        foreach ($this->getHeaders() as $name => $values) {
             $headers[$name] = implode(', ', $values);
-        }
-
-        foreach (['Trigger' => $this->triggers, 'Trigger-After-Swap' => $this->triggerAfterSwap, 'Trigger-After-Settle' => $this->triggerAfterSettle] as $suffix => $events) {
-            if ($events !== []) {
-                $headers['HX-' . $suffix] = Html::json($events);
-            }
         }
 
         return $headers;
@@ -195,25 +396,28 @@ final class Response
     /** Fire a client-side event. Pass `['evt' => 'detail']` for a payload. */
     public function trigger(string $event, array $detail = []): self
     {
-        $this->triggers[$event] = $detail === [] ? null : $detail;
+        $new = clone $this;
+        $new->triggers[$event] = $detail === [] ? null : $detail;
 
-        return $this;
+        return $new;
     }
 
     /** Fire a client-side event after the swap settles. */
     public function triggerAfterSwap(string $event, array $detail = []): self
     {
-        $this->triggerAfterSwap[$event] = $detail === [] ? null : $detail;
+        $new = clone $this;
+        $new->triggerAfterSwap[$event] = $detail === [] ? null : $detail;
 
-        return $this;
+        return $new;
     }
 
     /** Fire a client-side event after the settle step completes. */
     public function triggerAfterSettle(string $event, array $detail = []): self
     {
-        $this->triggerAfterSettle[$event] = $detail === [] ? null : $detail;
+        $new = clone $this;
+        $new->triggerAfterSettle[$event] = $detail === [] ? null : $detail;
 
-        return $this;
+        return $new;
     }
 
     /**
@@ -245,8 +449,10 @@ final class Response
             $parts[] = 'HttpOnly';
         }
 
-        return $this->withHeader('Set-Cookie', implode('; ', array_map(
-            static fn(string $part): string => self::sanitiseHeaderValue($part),
+        // Appended rather than replaced, so two cookies in one response — a
+        // session and a flash, say — do not leave the second clobbering the first.
+        return $this->withAddedHeader('Set-Cookie', implode('; ', array_map(
+            static fn (string $part): string => trim((string) preg_replace('/[\r\n\0]+/', '', $part)),
             $parts
         )));
     }
@@ -283,9 +489,11 @@ final class Response
      */
     public function stream(string $path): self
     {
-        $this->file = $path;
+        $new = clone $this;
+        $new->file = $path;
+        $new->stream = null;
 
-        return $this;
+        return $new;
     }
 
     /**
@@ -325,12 +533,11 @@ final class Response
         };
     }
 
-    /**
-     * Emit body and headers. This terminates the script.
-     *
-     * A streamed file is read in chunks rather than loaded whole, so
-     * downloading a large file costs no memory.
-     */
+    private static function sanitiseHeaderValue(string $value): string
+    {
+        return trim((string) preg_replace('/[\r\n\0]+/', '', $value));
+    }
+
     /**
      * Write this response to the client without terminating the process.
      *
@@ -364,7 +571,7 @@ final class Response
             return;
         }
 
-        echo $this->body;
+        echo (string) $this->getBody();
     }
 
     /**
