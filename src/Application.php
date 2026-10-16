@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Empira;
 
 use Empira\Config\Config;
+use Empira\Config\DatabaseConfig;
 use Empira\Console\CommandProvider;
 use Empira\Security\Guard;
 use Empira\Security\RequestUser;
@@ -359,8 +360,20 @@ class Application
     }
 
     /**
-     * The database settings, from the argument or from `db.*` in the container's
-     * Config.
+     * The database settings, from the argument, from `db.*` in the container's
+     * Config, or from the environment.
+     *
+     * **The environment is the last fallback, not the only source.** It used to
+     * be neither: with no argument and no bound `Config` this returned `[]`,
+     * `DatabaseConfig` filled in its defaults, and `orm()` silently opened
+     * `:memory:`. Nothing said so — the ORM connected, every query answered, and
+     * the only symptom was a table that had been migrated into a real file a
+     * moment earlier not being there. An application that had to spell out the
+     * database in code was not being redundant; it was working around this.
+     *
+     * So the fallback goes through {@see DatabaseConfig::fromEnvironment()},
+     * which is the same reader `empira migrate` uses. That is what the sentence
+     * below `orm()` has always claimed, and it is now true.
      *
      * @return array<string, mixed>
      */
@@ -374,7 +387,11 @@ class Application
             ? $this->container->get(Config::class)
             : null;
 
-        return $bound instanceof Config ? ($bound->array('db') ?: []) : [];
+        if ($bound instanceof Config && ($bound->array('db')) !== []) {
+            return $bound->array('db');
+        }
+
+        return DatabaseConfig::fromEnvironment()->array();
     }
 
     /**
