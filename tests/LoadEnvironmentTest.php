@@ -141,7 +141,7 @@ final class LoadEnvironmentTest extends TestCase
         $this->envFile("EMPIRA_TEST_ONE=from-file\n");
 
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Define __ROOT_DIR__');
+        $this->expectExceptionMessage('Define EMPIRA_APP_ROOT');
 
         Application::loadEnvironment([]);
     }
@@ -164,7 +164,7 @@ final class LoadEnvironmentTest extends TestCase
         $script = <<<'PHP'
             <?php
             require $argv[1] . '/vendor/autoload.php';
-            define('__ROOT_DIR__', $argv[2]);
+            define('EMPIRA_APP_ROOT', $argv[2]);
             Empira\Application::loadEnvironment(['EMPIRA_TEST_ONE']);
             echo $_ENV['EMPIRA_TEST_ONE'] ?? '(unset)';
             PHP;

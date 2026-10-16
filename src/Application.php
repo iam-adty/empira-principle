@@ -1234,8 +1234,8 @@ class Application
         // deployment can be laid out differently from its source tree, two
         // answers to "where is this application" is one too many — and the entry
         // point is the only one that was told.
-        $root = \defined('__ROOT_DIR__')
-            ? (string) \__ROOT_DIR__
+        $root = \defined('EMPIRA_APP_ROOT')
+            ? (string) \EMPIRA_APP_ROOT
             : dirname((string) (new \ReflectionClass(static::class))->getFileName(), 2);
 
         return $root . ($relative === '' ? '' : '/' . ltrim($relative, '/'));
@@ -1265,7 +1265,7 @@ class Application
      *
      * ## Where the application is
      *
-     * `$basePath` defaults to the `__ROOT_DIR__` an entry point defines, and
+     * `$basePath` defaults to the `EMPIRA_APP_ROOT` an entry point defines, and
      * refuses when there is neither. It does **not** fall back to `getcwd()`:
      * the working directory is whatever the process manager, the scheduler or
      * the operator happened to start the process in — the same mistake
@@ -1277,15 +1277,15 @@ class Application
     public static function loadEnvironment(array $keys = [], ?string $basePath = null): void
     {
         if ($basePath === null) {
-            if (! \defined('__ROOT_DIR__')) {
+            if (! \defined('EMPIRA_APP_ROOT')) {
                 throw new \LogicException(
                     'Application::loadEnvironment() needs to know where the application is. '
-                    . 'Define __ROOT_DIR__ in the entry point before booting, or pass the path. '
+                    . 'Define EMPIRA_APP_ROOT in the entry point before booting, or pass the path. '
                     . 'It will not guess: the working directory is whatever started the process.'
                 );
             }
 
-            $basePath = (string) \__ROOT_DIR__;
+            $basePath = (string) \EMPIRA_APP_ROOT;
         }
 
         foreach ($keys as $key) {
