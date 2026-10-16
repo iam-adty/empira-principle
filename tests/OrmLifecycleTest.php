@@ -145,6 +145,40 @@ final class OrmLifecycleTest extends TestCase
         self::assertSame($database, $params['path'] ?? $params['database'] ?? null);
     }
 
+    /**
+     * `orm($paths)` is a mistake the signature invites, and it used to be silent.
+     *
+     * Entity paths in the configuration argument means no `driver` and no
+     * `database`, so `DatabaseConfig` supplies its defaults and the application
+     * opens `:memory:` — connecting fine, answering every query, holding nothing.
+     *
+     * The one that shipped this: rewriting the skeleton's `App` to drop its
+     * hand-built config array and leaving `$this->orm([__DIR__, $entityPath])`
+     * behind. Everything booted. Every request worked. The `users` table was
+     * simply not there.
+     */
+    public function testEntityPathsInTheConfigurationArgumentAreRefused(): void
+    {
+        $app = new Application(self::SECRET, new NullState());
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('takes the database configuration first');
+
+        $app->orm([__DIR__ . '/Fixtures']);
+    }
+
+    /**
+     * An empty array is a caller saying "no overrides", not a caller who got the
+     * arguments the wrong way round — so it is not what the guard above refuses.
+     */
+    public function testAnEmptyConfigurationIsNotMistakenForMisplacedPaths(): void
+    {
+        $app = new Application(self::SECRET, new NullState());
+        $app->orm([], [__DIR__ . '/Fixtures']);
+
+        self::assertInstanceOf(EntityManagerInterface::class, $app->entities());
+    }
+
     public function testOrmMakesTheEntityManagerAutowirable(): void
     {
         $app = new Application(self::SECRET, new NullState());

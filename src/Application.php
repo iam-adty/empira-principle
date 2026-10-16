@@ -380,6 +380,24 @@ class Application
     private function dbConfig(?array $config): array
     {
         if ($config !== null) {
+            // A list is the *entity paths*, passed one argument too early —
+            // `orm($paths)` where the signature wants `orm($config, $paths)`.
+            //
+            // Worth refusing rather than ignoring, because the old behaviour was
+            // the worst kind: no `driver` and no `database` in the config meant
+            // `DatabaseConfig` supplied its defaults, so the application opened
+            // `:memory:`, every query answered, and the only symptom was a table
+            // migrated into a real file not being there. An empty array is left
+            // alone, because `orm([])` is a caller who means "no overrides".
+            if ($config !== [] && array_is_list($config)) {
+                throw new \LogicException(sprintf(
+                    'Application::orm() takes the database configuration first and the entity '
+                    . 'paths second, so orm($paths) is passing the paths as the configuration. '
+                    . 'Got %s. Did you mean orm(null, $paths)?',
+                    implode(', ', array_map(strval(...), $config)),
+                ));
+            }
+
             return $config;
         }
 
