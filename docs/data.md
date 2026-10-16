@@ -1,6 +1,6 @@
 # Data
 
-> **Status: describes shipped code.** Verified against `511 tests, 1153
+> **Status: describes shipped code.** Verified against `521 tests, 1168
 > assertions`, on SQLite.
 
 Persistence is Doctrine's. The framework wires it and gets out of the way:

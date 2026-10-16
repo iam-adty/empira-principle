@@ -1,6 +1,6 @@
 # Testing
 
-> **Status: describes shipped code.** `511 tests, 1153 assertions`.
+> **Status: describes shipped code.** `521 tests, 1168 assertions`.
 
 ## Running
 

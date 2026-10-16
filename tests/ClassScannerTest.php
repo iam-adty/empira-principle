@@ -24,6 +24,18 @@ final class ClassScannerTest extends TestCase
 {
     private string $directory;
 
+    /**
+     * Every log file this test has redirected `error_log` into.
+     *
+     * Tracked so `tearDown()` can remove them. `Temp::file()` creates the file
+     * whether or not anything writes to it, so a scan that logged nothing still
+     * leaves one behind — and the workspace's `tmp/` is expected to be empty
+     * between runs, which is the only reason anything would notice.
+     *
+     * @var list<string>
+     */
+    private array $logs = [];
+
     /** @var array<class-string, string> */
     private static array $fixturePaths = [];
 
@@ -51,11 +63,18 @@ final class ClassScannerTest extends TestCase
     protected function setUp(): void
     {
         $this->directory = Temp::dir('empira-scan-');
+        $this->logs = [];
     }
 
     protected function tearDown(): void
     {
         Temp::remove($this->directory);
+
+        foreach ($this->logs as $log) {
+            Temp::remove($log);
+        }
+
+        $this->logs = [];
     }
 
     /**
@@ -247,6 +266,8 @@ final class ClassScannerTest extends TestCase
     private function captureLog(callable $scan): string
     {
         $log = Temp::file('empira-scan-log-');
+        $this->logs[] = $log;
+
         $previous = (string) ini_get('error_log');
 
         ini_set('error_log', $log);
