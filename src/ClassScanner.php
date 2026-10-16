@@ -36,10 +36,12 @@ final class ClassScanner
     /**
      * Every autoloadable type under `$directory`, as `$namespace` describes it.
      *
-     * Interfaces included, because they are autoloadable and callers filter
-     * what they receive — a scanner that dropped them would make an interface
-     * look like a PSR-4 mistake and log about a file that was exactly where it
-     * belonged.
+     * Interfaces and traits included, because all three of those checks are
+     * autoloadable and callers filter what they receive. `class_exists()` alone
+     * is false for an interface *and* for a trait, so a scanner written that way
+     * reports files that are exactly where PSR-4 says they should be as if they
+     * were mistakes — which is how an application whose seams are three
+     * one-method interfaces got a warning on every console command.
      *
      * @return list<class-string>
      */
@@ -65,7 +67,7 @@ final class ClassScanner
             $relative = substr($file->getPathname(), strlen(rtrim($directory, '/')) + 1);
             $class = $prefix . str_replace(['/', '.php'], ['\\', ''], $relative);
 
-            if (!class_exists($class) && !interface_exists($class)) {
+            if (!class_exists($class) && !interface_exists($class) && !trait_exists($class)) {
                 // PSR-4 mismatch: the autoloader cannot find what the path implies.
                 error_log(sprintf('empira: no autoloadable class %s at %s', $class, $file->getPathname()));
 
