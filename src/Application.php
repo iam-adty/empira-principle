@@ -6,6 +6,7 @@ namespace Empira;
 
 use Empira\Config\Config;
 use Empira\Config\DatabaseConfig;
+use Empira\Config\Env;
 use Empira\Console\CommandProvider;
 use Empira\Security\Guard;
 use Empira\Security\RequestUser;
@@ -1229,9 +1230,69 @@ class Application
      */
     protected static function basePath(string $relative = ''): string
     {
-        $root = dirname((string) (new \ReflectionClass(static::class))->getFileName(), 2);
+        // An entry point that said where it is wins over reflection. Once a
+        // deployment can be laid out differently from its source tree, two
+        // answers to "where is this application" is one too many — and the entry
+        // point is the only one that was told.
+        $root = \defined('__ROOT_DIR__')
+            ? (string) \__ROOT_DIR__
+            : dirname((string) (new \ReflectionClass(static::class))->getFileName(), 2);
 
         return $root . ($relative === '' ? '' : '/' . ltrim($relative, '/'));
+    }
+
+    /**
+     * Load `.env` into `$_ENV`, before anything reads configuration from it.
+     *
+     * The keys in `$keys` are stripped **before** the file is read, so a value
+     * the shell exported cannot win. That ordering is the whole interesting part,
+     * and getting it backwards makes `.env` silently override the deployment it
+     * was meant to be overridden by — or lets `export APP_ENV=production` in one
+     * terminal change what a development machine serves, leaving two answers to
+     * "what configuration is in effect".
+     *
+     * The cost is real: injected environment variables stop reaching the
+     * application, because a value that never arrives in `$_ENV` cannot be
+     * consulted. A deployment supplies a real `.env` file instead, which means
+     * the secret is on disk and belongs in a file mode its owner cannot read.
+     *
+     * ## Why `$keys` and not the whole file
+     *
+     * The *mechanism* belongs to the framework; the *keys* belong to the
+     * application. The framework cannot know that `LOG_LEVEL` is configuration
+     * and `NOT_A_REAL_KEY` is not, so an application passes its own list and
+     * only its own keys fall through to this class's defaults.
+     *
+     * ## Where the application is
+     *
+     * `$basePath` defaults to the `__ROOT_DIR__` an entry point defines, and
+     * refuses when there is neither. It does **not** fall back to `getcwd()`:
+     * the working directory is whatever the process manager, the scheduler or
+     * the operator happened to start the process in — the same mistake
+     * `DebugToolsModule` made, and the reason its recordings landed somewhere
+     * else on a deploy that did not run from the project root.
+     *
+     * @param list<string> $keys configuration this application owns
+     */
+    public static function loadEnvironment(array $keys = [], ?string $basePath = null): void
+    {
+        if ($basePath === null) {
+            if (! \defined('__ROOT_DIR__')) {
+                throw new \LogicException(
+                    'Application::loadEnvironment() needs to know where the application is. '
+                    . 'Define __ROOT_DIR__ in the entry point before booting, or pass the path. '
+                    . 'It will not guess: the working directory is whatever started the process.'
+                );
+            }
+
+            $basePath = (string) \__ROOT_DIR__;
+        }
+
+        foreach ($keys as $key) {
+            unset($_ENV[$key]);
+        }
+
+        $_ENV = array_merge($_ENV, Env::fromFile($basePath . '/.env'));
     }
 
     /**
