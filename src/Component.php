@@ -35,10 +35,19 @@ use Empira\Validation\Validator;
  *         protected function render(): Element
  *         {
  *             return $this->hx->div('#counter')
- *                 ->append($this->hx->button('+1')->action('increment'))
- *                 ->text((string) $this->count);
+ *                 ->append($this->hx->strong()->text((string) $this->count))
+ *                 ->append($this->hx->button('+1')->action('increment'));
  *         }
  *     }
+ *
+ * Note the two `append()` calls and no `text()` on the parent. `Element::text()`
+ * **replaces** every child with one text node, so ending a chain with it
+ * discards whatever was appended before it — this example once did exactly
+ * that, and rendered a counter with no button at all. Every other copy in this
+ * package got it right, so nothing caught it: a docblock is prose until
+ * something renders it. {@see Console\Commands\MakeComponent} is the
+ * executable version, and `ConsoleTest` renders what it writes rather than
+ * matching its text.
  *
  * ## Actions
  *

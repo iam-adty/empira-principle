@@ -85,6 +85,79 @@ final class ConsoleTest extends TestCase
         $this->assertStringContainsString("\$this->hx->button('+1')->action('increment')", $contents);
     }
 
+    /**
+     * The component this command writes actually renders a working button.
+     *
+     * Every other assertion in this file matches *text*, so a scaffold that
+     * rendered nothing at all would pass all of them — which is exactly how the
+     * framework's own docblock example shipped for months: it appended a button
+     * and then called `text()` on the parent, which replaces every child, so the
+     * example rendered a counter with no button. `docs/components.md`,
+     * `README.md` and `MakeComponent` itself all got it right, and nothing
+     * noticed the one that did not, because a docblock is prose until something
+     * renders it.
+     *
+     * This renders it. The class name is unique so a second call in the same
+     * process cannot collide with the first.
+     */
+    public function testTheComponentItWritesRendersItsActionUrl(): void
+    {
+        $target = $this->tempdir();
+
+        $this->console(['empira', 'make:component', 'ScaffoldedCounter', '--target=' . $target]);
+
+        // The generated file is in a temporary directory under a namespace this
+        // suite does not autoload, so it needs a loader of its own. Prepended,
+        // because Composer knows `App\Components\Counter` from other tests and
+        // would answer for that name first.
+        $loader = static function (string $class) use ($target): void {
+            if (! str_starts_with($class, 'App\Components\ScaffoldedCounter')) {
+                return;
+            }
+
+            $path = $target . '/src/components/ScaffoldedCounter.php';
+
+            if (is_file($path)) {
+                require_once $path;
+            }
+        };
+
+        spl_autoload_register($loader, true, true);
+
+        try {
+            $app = new \Empira\Application(self::SECRET, new \Empira\State\NullState());
+            $app->components('App\\Components\\');
+
+            $html = (string) $app->render(\App\Components\ScaffoldedCounter::class)->render();
+        } finally {
+            spl_autoload_unregister($loader);
+        }
+
+        // The button, and the URL htmx will POST to — which only exists if the
+        // registry could name the class, which is the thing that silently breaks
+        // for a nested component.
+        $this->assertStringContainsString('<button', $html, 'the scaffold renders no button');
+        $this->assertMatchesRegularExpression(
+            '/hx-post="[^"]+\/increment"/',
+            $html,
+            'the scaffold rendered no action URL for its own action',
+        );
+        // The swap target has to exist. A button whose `hx-target` names an id
+        // that is not in the markup swaps nothing and errors in the console —
+        // and that is the same shape as a toolbar whose assets 404: the markup
+        // looks right and the interaction is dead. The scaffold does not hard-code
+        // an id, the framework assigns one, so this compares rather than asserts
+        // a literal.
+        preg_match('/hx-target="#([^"]+)"/', $html, $target);
+
+        $this->assertNotEmpty($target[1] ?? '', 'the button names no swap target');
+        $this->assertStringContainsString(
+            'id="' . $target[1] . '"',
+            $html,
+            'the swap target names an id the markup does not contain',
+        );
+    }
+
     public function testMakeComponentWillNotOverwriteWithoutForce(): void
     {
         $target = $this->tempdir();
@@ -679,6 +752,8 @@ final class ConsoleTest extends TestCase
     /**
      * A fresh temporary directory, removed when the test finishes.
      */
+    private const SECRET = 'a-secret-long-enough-for-testing';
+
     private function tempdir(): string
     {
         $directory = Temp::dir('empira-console-');
