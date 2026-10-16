@@ -1215,11 +1215,8 @@ class Application
      * The application directory, for reaching files the autoloader cannot.
      *
      * Everything under `src/` is found by the autoloader and the route
-     * discoverer, so this is for the three things that are neither: `bootstrap/`,
-     * `.env`, and the storage directory.
-     *
-     * Assumes the application's class sits in `<root>/src/`, which is where the
-     * skeleton's is and where PSR-4 puts an `App` by convention.
+     * discoverer, so this is for the three things that are neither:
+     * `bootstrap/`, `.env`, and the storage directory.
      *
      * A framework default cannot know any of this. `SqliteStorage` ships inside
      * this package, so `dirname(__DIR__)` from there resolves to the framework's
@@ -1227,18 +1224,52 @@ class Application
      * test run, and gone with the next install. It therefore answers a path
      * relative to the application root, and *this* is the application supplying
      * that root.
+     *
+     * ## Two answers, and they fail in opposite ways
+     *
+     * `EMPIRA_APP_ROOT` cannot be *wrong* — an entry point that sets it is
+     * stating a fact — but it can be *missing*, and reflection then has to
+     * answer. Reflection cannot be unknown; it can only be **wrong**, because
+     * `dirname(…, 2)` assumes the class sits in `<root>/src/`. That assumption
+     * is PSR-4's convention rather than its rule, and when it does not hold the
+     * consequence is not an error: the database and the profiler's recordings
+     * go somewhere nobody is looking.
+     *
+     * So the constant wins when present, and reflection is *checked* when it is
+     * not. A candidate without a `src/` in it is refused by name, with both
+     * remedies — because every failure this method can have is better as a boot
+     * that stops than as a path that silently resolves.
      */
     protected static function basePath(string $relative = ''): string
     {
-        // An entry point that said where it is wins over reflection. Once a
-        // deployment can be laid out differently from its source tree, two
-        // answers to "where is this application" is one too many — and the entry
-        // point is the only one that was told.
         $root = \defined('EMPIRA_APP_ROOT')
             ? (string) \EMPIRA_APP_ROOT
-            : dirname((string) (new \ReflectionClass(static::class))->getFileName(), 2);
+            : self::reflectedRoot();
 
         return $root . ($relative === '' ? '' : '/' . ltrim($relative, '/'));
+    }
+
+    /**
+     * The root derived from where this class's own file sits, or a refusal.
+     *
+     * @internal
+     */
+    private static function reflectedRoot(): string
+    {
+        $root = dirname((string) (new \ReflectionClass(static::class))->getFileName(), 2);
+
+        if (is_dir($root . '/src')) {
+            return $root;
+        }
+
+        throw new \LogicException(sprintf(
+            '%s does not look like an application root: there is no src/ in %s. Either the class '
+            . 'belongs at <root>/src/, which is where PSR-4 conventionally puts it, or the '
+            . 'deployment is laid out differently and needs EMPIRA_APP_ROOT defined in its entry '
+            . 'point.',
+            static::class,
+            $root,
+        ));
     }
 
     /**

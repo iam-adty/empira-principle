@@ -212,6 +212,18 @@ signal. `alpha` is honestly non-stable and promises nothing about a 1.0 API.
   interpolated its own directory, which was true in the application and actively
   wrong in a package — it would have pointed at `vendor/…/principle/.env`.
 
+- **`basePath()` refuses a root that is not one.** `dirname(…, 2)` assumes the
+  application's class sits in `<root>/src/`, which is PSR-4's convention rather
+  than its rule. When the assumption does not hold nothing failed: the database
+  and the profiler's recordings went to a directory nobody was looking at, and
+  every query still answered. A candidate with no `src/` in it is now refused by
+  name, naming both remedies — move the class, or define `EMPIRA_APP_ROOT`.
+
+  The constant and reflection fail in opposite ways, which is why both are kept.
+  `EMPIRA_APP_ROOT` cannot be wrong but can be missing; reflection cannot be
+  missing but can be wrong. The constant wins when present, reflection is checked
+  when it is not.
+
 - **`ClassScanner` no longer logs about interfaces and traits.** `class_exists()`
   is false for both, so an application with either under a scanned directory got
   a "no autoloadable class" warning about a file exactly where PSR-4 said it
