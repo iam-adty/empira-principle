@@ -1139,4 +1139,169 @@ class Application
 
         return $this;
     }
+
+    // ------------------------------------------------------- the application's
+    // ---------------------------------------------------------- own vocabulary
+    //
+    // How a subclass describes *itself* — in attributes, naming classes it does
+    // not construct. None of it belongs to any one application, which is why it
+    // is here rather than in the skeleton that first needed it: it was written
+    // twice, identically, in `app/src/App.php` and in the scratch application's
+    // own `App.php`, and drifted twice.
+
+    /**
+     * This application's own attribute of the given type.
+     *
+     * `static::class` rather than `self::class`, so a subclass reads its own and
+     * this is not an `Application` reading `Application`'s.
+     *
+     * `$required` is for attributes an application may legitimately have no
+     * opinion about. `#[Modules]` and `#[Overrides]` are not optional — an
+     * application missing one has nothing to build itself from, and saying so by
+     * name beats booting with a default nobody chose.
+     *
+     * @template T of object
+     * @param class-string<T> $name
+     * @return ($required is true ? T : (T|null))
+     */
+    protected static function attribute(string $name, bool $required = true): ?object
+    {
+        $found = (new \ReflectionClass(static::class))
+            ->getAttributes($name, \ReflectionAttribute::IS_INSTANCEOF);
+
+        if ($found === []) {
+            if (! $required) {
+                return null;
+            }
+
+            throw new \LogicException(sprintf(
+                '%s must declare #[%s] — an application with neither has nothing to build itself from.',
+                static::class,
+                $name,
+            ));
+        }
+
+        return $found[0]->newInstance();
+    }
+
+    /**
+     * One named override, built, or a refusal saying exactly what is wrong.
+     *
+     * A class name in an attribute is a string until something checks it, and
+     * this is where the check happens — before the application has built
+     * anything, so a typo is a boot that stops with a message rather than a
+     * request that does.
+     *
+     * @template T of object
+     * @param class-string<T> $class
+     * @param class-string $contract
+     * @return T
+     */
+    protected static function override(string $class, string $contract): object
+    {
+        if (! is_a($class, $contract, true)) {
+            throw new \LogicException(sprintf(
+                '#[Overrides] named %s, which does not implement %s.',
+                class_exists($class) ? $class : sprintf('%s (no such class)', $class),
+                $contract,
+            ));
+        }
+
+        return new $class();
+    }
+
+    /**
+     * The application directory, for reaching files the autoloader cannot.
+     *
+     * Everything under `src/` is found by the autoloader and the route
+     * discoverer, so this is for the three things that are neither: `bootstrap/`,
+     * `.env`, and the storage directory.
+     *
+     * Assumes the application's class sits in `<root>/src/`, which is where the
+     * skeleton's is and where PSR-4 puts an `App` by convention.
+     *
+     * A framework default cannot know any of this. `SqliteStorage` ships inside
+     * this package, so `dirname(__DIR__)` from there resolves to the framework's
+     * own directory and a skeleton's database lands in `vendor/` — green in a
+     * test run, and gone with the next install. It therefore answers a path
+     * relative to the application root, and *this* is the application supplying
+     * that root.
+     */
+    protected static function basePath(string $relative = ''): string
+    {
+        $root = dirname((string) (new \ReflectionClass(static::class))->getFileName(), 2);
+
+        return $root . ($relative === '' ? '' : '/' . ltrim($relative, '/'));
+    }
+
+    /**
+     * Write the database default where both readers will find it.
+     *
+     * {@see DatabaseConfig} reads `DB_DRIVER` and `DB_DATABASE`, and the
+     * framework's own default is `:memory:` — a database which vanishes on exit,
+     * followed by an application querying a real one with no tables in it. A
+     * migration against `:memory:` is the same failure arriving from the other
+     * end.
+     *
+     * Only fills a gap. A `DB_DATABASE` already in the environment is somebody's
+     * deliberate choice and is left alone.
+     */
+    protected static function publishDatabaseDefaults(string $path): void
+    {
+        foreach (['DB_DRIVER' => 'sqlite', 'DB_DATABASE' => $path] as $key => $value) {
+            if (! isset($_ENV[$key]) || $_ENV[$key] === '') {
+                $_ENV[$key] = $value;
+            }
+        }
+    }
+
+    /**
+     * Install the modules named by class, configured with whatever options this
+     * application declared.
+     *
+     * Resolved through the container rather than constructed, so a module can
+     * build itself from what the framework has already bound — an auth module
+     * needs this application's session and its entity manager, and neither
+     * exists at the point an attribute is read.
+     *
+     * Options come from every {@see ModuleOption} attribute on this class,
+     * merged. The framework does not know what any of them are called, which is
+     * what lets a module publish an option without an application or framework
+     * edit to go with it.
+     *
+     * @param list<class-string<Module>> $classes
+     */
+    protected function installModules(array $classes): void
+    {
+        $options = $this->moduleOptions();
+
+        $this->module(...array_map(function (string $class) use ($options): Module {
+            $module = $this->container()->get($class);
+
+            // A module that takes options says so; one that does not simply has
+            // none, and neither this file nor the framework has to know which.
+            if ($module instanceof ConfigurableModule) {
+                $module->configure($options);
+            }
+
+            return $module;
+        }, $classes));
+    }
+
+    /**
+     * Everything this application declared, as one options array.
+     *
+     * @return array<string, mixed>
+     */
+    private function moduleOptions(): array
+    {
+        $options = [];
+
+        foreach ((new \ReflectionClass(static::class))
+            ->getAttributes(ModuleOption::class, \ReflectionAttribute::IS_INSTANCEOF) as $attribute) {
+            $options = array_merge($options, $attribute->newInstance()->options());
+        }
+
+        return $options;
+    }
 }

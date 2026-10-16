@@ -17,11 +17,10 @@ namespace Empira\Application;
  *
  * ## It says one thing
  *
- * Which modules load. Options belong to the modules themselves, and reach them
- * through {@see \Empira\ConfigurableModule::configure()} — a module that wants
- * to be told something declares that it wants to be told, and core never has to
- * learn the option's name. {@see LoginPage} is the framework's own answer to
- * the general problem, for the one option nearly every application needs.
+ * Which modules load. Options belong to the modules themselves: a module
+ * publishes a {@see \Empira\ModuleOption} attribute, the application puts it on
+ * its class, and `Application::installModules()` collects them — so core never
+ * learns an option's name, and adding one is a change to that module alone.
  *
  * ## Why a name rather than an instance
  *
