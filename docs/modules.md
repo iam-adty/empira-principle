@@ -1,6 +1,6 @@
 # Modules
 
-> **Status: describes shipped code.** Verified against `490 tests, 1103
+> **Status: describes shipped code.** Verified against `511 tests, 1153
 > assertions`.
 
 The framework assumes an application needs very little. Everything else is

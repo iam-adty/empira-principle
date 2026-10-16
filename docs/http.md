@@ -176,14 +176,17 @@ the only place the script ends.
 ## Middleware
 
 ```php
-interface Middleware
+interface Middleware extends Psr\Http\Server\MiddlewareInterface
 {
-    public function handle(Request $request, Closure $next): Response;
+    public function process(
+        Psr\Http\Message\ServerRequestInterface $request,
+        Psr\Http\Server\RequestHandlerInterface $handler,
+    ): Psr\Http\Message\ResponseInterface;
 }
 ```
 
-Call `$next($request)` to carry on, or return your own response to short-circuit.
-Onion order — the first-registered layer is outermost:
+Call `$handler->handle($request)` to carry on, or return your own response to
+short-circuit. Onion order — the first-registered layer is outermost:
 
 ```php
 $app->use($first, $second);
@@ -191,6 +194,56 @@ $app->use($first, $second);
 ```
 
 The constructor is autowired, so a middleware asks for what it needs by type.
+
+### PSR-15
+
+This is the standard's interface, not a lookalike. Middleware written by
+anybody else against PSR-15 runs here unadapted, and this package's own
+middleware can be handed to a PSR-15 host.
+
+Route handlers stay closures — `fn(Request): Response` — because that is what
+every route in every application here is, and `Pipeline` wraps the destination
+in a handler rather than making each route a class.
+
+The parameter is typed as the interface requires, and **PHP forbids narrowing a
+parameter**, so the htmx conveniences (`isHtmx()`, `input()`, `accepts()`) are
+out of scope inside `process()`. `Request::of()` gets them back in one line:
+
+```php
+public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+{
+    $empira = Request::of($request);
+
+    return $empira->isHtmx() ? $handler->handle($empira) : Response::html('…');
+}
+```
+
+It throws rather than returning null. A middleware that quietly degraded to the
+interface's methods would work for everything except the htmx case — which is
+exactly the case nobody would notice until a swap stopped being one.
+
+## Responses are immutable
+
+Every `with*()` returns a **new** response:
+
+```php
+$response->withHeader('X-A', 'b');               // no effect
+$response = $response->withHeader('X-A', 'b');   // what you meant
+```
+
+There is no mutating counterpart. `setBody()` and `setStatus()` were removed
+rather than kept as aliases, because one immutable way and one mutable way is
+how a codebase ends up with responses that half the pipeline believes are
+shared.
+
+Two header shapes exist, deliberately: `getHeaders()` is PSR's
+`array<string, string[]>`, because a header may repeat, and `headers()` is this
+package's `array<string, string>`, because that is what the emitter and htmx
+want. `headers()` is derived from `getHeaders()`, so they cannot drift.
+
+PSR-17 factories are in [`Empira\Http\Psr17`](http.md), and the messages they
+build are this package's own — a factory request satisfies the standard *and*
+keeps `path()`, `input()` and the rest.
 
 ## Session
 

@@ -145,14 +145,17 @@ final class RequireAuth implements Middleware
 {
     public function __construct(private readonly Session $session) {}
 
-    public function handle(Request $request, Closure $next): Response
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         return $this->session->has('user_id')
-            ? $next($request)
+            ? $handler->handle($request)
             : Response::html('Sign in', 401);
     }
 }
 ```
+
+That is PSR-15's `process()`. [`Request::of()`](http.md#middleware) narrows the
+parameter back to this framework's own where a layer wants the htmx helpers.
 
 ## Attribute routing
 
