@@ -22,6 +22,35 @@ signal. `alpha` is honestly non-stable and promises nothing about a 1.0 API.
 
 ### Added
 
+- **`Empira\Application\` — the seam an application is built from.** `Modules`,
+  `LoginPage`, `Overrides`, `ProvidesSecret`, `ProvidesLogger`, `ProvidesStorage`,
+  `EnvSecret`, `StderrLogger` and `SqliteStorage`. All nine were in the `app/`
+  skeleton, which is the one directory in the workspace belonging to no package
+  and therefore tested by nobody.
+
+  `Modules` is variadic and says one thing — which modules load:
+
+  ```php
+  #[Modules(AuthModule::class, DebugToolsModule::class)]
+  #[LoginPage(LoginLayout::class)]
+  #[Overrides(secret: EnvSecret::class, logger: StderrLogger::class, storage: SqliteStorage::class)]
+  final class App extends Application {}
+  ```
+
+  A variadic must be the last parameter, which is why `login:` cannot stay on
+  `Modules` and became `#[LoginPage]` instead. That constraint produced a better
+  shape than the one it replaced: a module's identity and a module's
+  configuration are different facts.
+
+  `Empira\Application` the class and the `Empira\Application\` namespace coexist,
+  which is legal and deliberate — the namespace is the vocabulary an application
+  uses to describe itself.
+
+- **`monolog/monolog` is now a dependency**, for `StderrLogger` alone.
+  `Application::log()` still takes a `LoggerInterface` and `principle/src` outside
+  `Application/StderrLogger.php` still names no concrete implementation. The
+  framework ships *a* working default rather than none; an application supplying
+  its own logger never touches Monolog.
 - **A `Response::emit()` that does not exit.** `send()` emits and then exits,
   which is right for a process with nothing else to do and fatal for a
   long-running worker: FrankenPHP restarts the script, so an `exit` in the
@@ -164,6 +193,27 @@ signal. `alpha` is honestly non-stable and promises nothing about a 1.0 API.
   `LogicException` naming the class, rather than a bare `TypeError`.
 
 ### Fixed
+
+- **`SqliteStorage` answers a relative path.** It is the framework's default now
+  rather than the skeleton's, so `dirname(__DIR__)` resolves into `vendor/` — a
+  skeleton's database landing inside the package it was installed from, green in
+  a test run and gone with the next `composer install`. It answers
+  `storage/app.sqlite` and the application resolves that against its own root.
+  `ProvidesStorage` allows either form, so an absolute path still passes through.
+
+- **`EnvSecret` names `.env` without claiming to know where it is.** Its refusal
+  interpolated its own directory, which was true in the application and actively
+  wrong in a package — it would have pointed at `vendor/…/principle/.env`.
+
+- **`ClassScanner` no longer logs about interfaces and traits.** `class_exists()`
+  is false for both, so an application with either under a scanned directory got
+  a "no autoloadable class" warning about a file exactly where PSR-4 said it
+  should be.
+
+- **`Application::orm()` with no configuration reads the environment.** It
+  returned `[]` when no `Config` was bound, which was always, so the ORM opened
+  `:memory:` and every query answered. `orm($paths)` — entity paths in the
+  configuration argument — is now refused rather than silently ignored.
 
 - **The suite could pass having run almost none of itself.** PHPUnit chooses its
   exit status in `ShellExitCodeCalculator`, which nothing reaches if the process
