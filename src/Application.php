@@ -57,8 +57,20 @@ use Psr\Log\NullLogger;
  *
  * @see \Empira\Component
  * @see \Empira\Registry
+ *
+ * ## Not `final`, deliberately
+ *
+ * Composing this is the conventional way to be an application, and what most
+ * of them do. Extending it is the other way, and an application whose own
+ * `App` class *is* its `Application` gets something composition cannot: the class
+ * that boots the application is also the class that declares what it is, so the
+ * secret, the modules and the login page are attributes on it rather than
+ * arguments threaded through a constructor that also builds a logger.
+ *
+ * The cost is that this class's methods are now part of someone's public
+ * surface, so a signature cannot change the way one on a `final` class can.
  */
-final class Application
+class Application
 {
     private Registry $registry;
     private TokenCodec $tokens;
