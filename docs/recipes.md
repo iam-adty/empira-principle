@@ -269,6 +269,10 @@ through an interface of its own. Hand it one during boot:
 $app->log(new Monolog\Logger('app'));
 ```
 
+or leave it alone: the framework ships a working default —
+`Application\StderrLogger`, JSON on stderr — which an application names rather
+than constructs:
+
 and anything else — a component action, a repository — can ask for the same one
 by type, the way it asks for `Auth`:
 

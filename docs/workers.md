@@ -10,10 +10,10 @@ composer serve                              # classic, one request, one process
 A worker is something an application installs, like any other module:
 
 ```php
-use App\App\Modules;
+use Empira\Application\Modules;
 use Empira\FrankenPhp\FrankenPhpModule;
 
-#[Modules([FrankenPhpModule::class])]
+#[Modules(FrankenPhpModule::class)]
 final class App extends Application
 {
     // …
